@@ -189,7 +189,7 @@ void MapROS::proessDepthImage() {
   int rows = depth_image_->rows;
   double depth;
   float attention=0;
-  float alpha = 0.8;
+  float alpha = 1;
   Eigen::Matrix3d camera_r = camera_q_.toRotationMatrix();
   Eigen::Vector3d pt_cur, pt_world;
   const double inv_factor = 1.0 / k_depth_scaling_factor_;
@@ -244,11 +244,11 @@ void MapROS::proessDepthImage() {
             // if (map_->md_->occupancy_buffer_inflate_[vox_adr] == 1) //update attention only for inflated occupied cells
             // if (map_->md_->occupancy_buffer_[vox_adr] > map_->mp_->min_occupancy_log_){ //update attention only for occupied cells
             if (map_->getOccupancy(idx) == map_->OCCUPIED){
-            // map_->md_->attention_buffer_[vox_adr] = alpha*attention + (1-alpha)*map_->md_->attention_buffer_[vox_adr];
-              map_->md_->attention_buffer_[vox_adr]  = attention;
+            map_->md_->attention_buffer_[vox_adr] = alpha*attention + (1-alpha)*map_->md_->attention_buffer_[vox_adr];
+              // map_->md_->attention_buffer_[vox_adr]  = attention;
             }
             else{
-              map_->md_->attention_buffer_[vox_adr]  = 0;
+              // map_->md_->attention_buffer_[vox_adr]  =  0;
             }
             // ROS_ERROR_STREAM("new: "<<map_->md_->attention_buffer_[vox_adr]);
           }

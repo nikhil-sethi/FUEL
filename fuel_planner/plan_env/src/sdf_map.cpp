@@ -448,7 +448,7 @@ void SDFMap::clearAndInflateLocalMap() {
     for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
       for (int z = md_->local_bound_min_(2); z <= md_->local_bound_max_(2); ++z) {
         md_->occupancy_buffer_inflate_[toAddress(x, y, z)] = 0;
-        if (md_->occupancy_buffer_[toAddress(x, y, z)] < mp_->min_occupancy_log_) md_->attention_buffer_[toAddress(x, y, z)] =0;
+        if (md_->occupancy_buffer_[toAddress(x, y, z)] < mp_->min_occupancy_log_) md_->attention_buffer_[toAddress(x, y, z)] *=0.1;
 
       }
 
