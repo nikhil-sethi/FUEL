@@ -105,6 +105,8 @@ void MapROS::visCallback(const ros::TimerEvent& e) {
 
   // publishUpdateRange();
   // publishDepth();
+  publishAtt();
+
 }
 
 void MapROS::updateESDFCallback(const ros::TimerEvent& /*event*/) {
