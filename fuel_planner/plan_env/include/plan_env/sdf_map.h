@@ -118,7 +118,8 @@ struct MapData {
   char raycast_num_;
   queue<int> cache_voxel_;
   Eigen::Vector3i local_bound_min_, local_bound_max_;
-  Eigen::Vector3d update_min_, update_max_;
+  Eigen::Vector3d update_min_, update_max_;  // Box for recent update
+  Eigen::Vector3d all_min_, all_max_;        // Box for overall update
   bool reset_updated_box_;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

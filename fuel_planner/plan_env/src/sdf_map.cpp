@@ -90,6 +90,10 @@ void SDFMap::initMap(ros::NodeHandle& nh) {
 
   caster_.reset(new RayCaster);
   caster_->setParams(mp_->resolution_, mp_->map_origin_);
+  for (int i = 0; i < 3; ++i) {
+    md_->all_min_[i] = 1000000;
+    md_->all_max_[i] = -1000000;
+  }
 }
 
 void SDFMap::resetBuffer() {
@@ -327,6 +331,8 @@ void SDFMap::inputPointCloud(
   for (int k = 0; k < 3; ++k) {
     md_->update_min_[k] = min(update_min[k], md_->update_min_[k]);
     md_->update_max_[k] = max(update_max[k], md_->update_max_[k]);
+    md_->all_min_[k] = min(update_min[k], md_->all_min_[k]);
+    md_->all_max_[k] = max(update_max[k], md_->all_max_[k]);
   }
 
   while (!md_->cache_voxel_.empty()) {
