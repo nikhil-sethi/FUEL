@@ -47,6 +47,9 @@ public:
   void boundBox(Eigen::Vector3d& low, Eigen::Vector3d& up);
   int getOccupancy(const Eigen::Vector3d& pos);
   int getOccupancy(const Eigen::Vector3i& id);
+
+  float getAttention(const Eigen::Vector3i& id);
+
   void setOccupied(const Eigen::Vector3d& pos, const int& occ = 1);
   int getInflateOccupancy(const Eigen::Vector3d& pos);
   int getInflateOccupancy(const Eigen::Vector3i& id);
@@ -123,6 +126,8 @@ struct MapData {
   bool reset_updated_box_;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  std::vector<float> attention_buffer_;
 };
 
 inline void SDFMap::posToIndex(const Eigen::Vector3d& pos, Eigen::Vector3i& id) {
@@ -206,6 +211,11 @@ inline int SDFMap::getOccupancy(const Eigen::Vector3d& pos) {
   Eigen::Vector3i id;
   posToIndex(pos, id);
   return getOccupancy(id);
+}
+
+inline float SDFMap::getAttention(const Eigen::Vector3i& id) {
+  if (!isInMap(id)) return -1;
+  return md_->attention_buffer_[toAddress(id)];
 }
 
 inline void SDFMap::setOccupied(const Eigen::Vector3d& pos, const int& occ) {

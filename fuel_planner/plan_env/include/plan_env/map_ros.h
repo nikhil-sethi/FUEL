@@ -47,6 +47,14 @@ private:
 
   void proessDepthImage();
 
+  // custom
+  void attCallback(const sensor_msgs::ImageConstPtr& img);
+  void publishAtt();
+  unique_ptr<cv::Mat> att_image_; // holds 2d attention map
+  ros::Subscriber att_sub_; // subscribes to 2d attention map
+  ros::Publisher att_3d_pub_;  // publish 3d attention map
+  bool attention_needs_update_ = false;
+
   SDFMap* map_;
   // may use ExactTime?
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped>

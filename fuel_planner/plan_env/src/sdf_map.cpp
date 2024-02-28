@@ -70,6 +70,9 @@ void SDFMap::initMap(ros::NodeHandle& nh) {
   md_->flag_visited_ = vector<char>(buffer_size, -1);
   md_->tmp_buffer1_ = vector<double>(buffer_size, 0);
   md_->tmp_buffer2_ = vector<double>(buffer_size, 0);
+
+  md_->attention_buffer_ = vector<float>(buffer_size, 0);
+
   md_->raycast_num_ = 0;
   md_->reset_updated_box_ = true;
   md_->update_min_ = md_->update_max_ = Eigen::Vector3d(0, 0, 0);
@@ -445,6 +448,8 @@ void SDFMap::clearAndInflateLocalMap() {
     for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
       for (int z = md_->local_bound_min_(2); z <= md_->local_bound_max_(2); ++z) {
         md_->occupancy_buffer_inflate_[toAddress(x, y, z)] = 0;
+        if (md_->occupancy_buffer_[toAddress(x, y, z)] < mp_->min_occupancy_log_) md_->attention_buffer_[toAddress(x, y, z)] =0;
+
       }
 
   // inflate newest occpuied cells
