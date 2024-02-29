@@ -120,6 +120,80 @@ void FrontierFinder::searchFrontiers() {
   ROS_WARN_THROTTLE(5.0, "Frontier t: %lf", (ros::Time::now() - t1).toSec());
 }
 
+// void FrontierFinder::searchObjects(){
+//   // create a box in which to search for attentive cells
+//   // find a seed cell which is attentive and lies on occupied space
+//   // expand from the seed cell to find an attentive cluster
+//   // create an object struct out of the cluster
+  
+//   objects.clear();
+//   // hardcoded box for now
+//   Eigen::Vector3d search_min, search_max;
+//   search_min = Eigen::Vector3d(-1, -0.5, 0);
+//   search_min = Eigen::Vector3d(1, 1.5, 2);
+
+//   Eigen::Vector3i min_id, max_id;
+//   edt_env_->sdf_map_->posToIndex(search_min, min_id);
+//   edt_env_->sdf_map_->posToIndex(search_max, max_id);
+
+//    for (int x = min_id(0); x <= max_id(0); ++x)
+//     for (int y = min_id(1); y <= max_id(1); ++y)
+//       for (int z = min_id(2); z <= max_id(2); ++z) {
+//         // Scanning the updated region to find seeds of frontiers
+//         Eigen::Vector3i cur(x, y, z);
+//         // if (object_flag_[toadr(cur)] == 0 && knownfree(cur) && isNeighborUnknown(cur)) {
+//         if (sdf_map_->md_->attention_buffer_[toadr(cur)]>0)  
+//           // Expand from the seed cell to find a complete frontier cluster
+//           expandObject(cur);
+//         }
+//       }
+// }
+
+// void FrontierFinder::expandObject(const Eigen::Vector3i& first) {
+//   // std::cout << "depth: " << depth << std::endl;
+//   auto t1 = ros::Time::now();
+
+//   // Data for clustering
+//   queue<Eigen::Vector3i> cell_queue;
+//   vector<Eigen::Vector3d> expanded;
+//   Vector3d pos;
+
+//   edt_env_->sdf_map_->indexToPos(first, pos);
+//   expanded.push_back(pos);
+//   cell_queue.push(first);
+//   // frontier_flag_[toadr(first)] = 1;
+
+//   // Search frontier cluster based on region growing (distance clustering)
+//   while (!cell_queue.empty()) {
+//     auto cur = cell_queue.front();
+//     cell_queue.pop();
+//     auto nbrs = allNeighbors(cur);
+//     for (auto nbr : nbrs) {
+//       // Qualified cell should be inside bounding box and frontier cell not clustered
+//       int adr = toadr(nbr);
+//       if (!edt_env_->sdf_map_->isInBox(nbr) ||
+//           !(isNeighborAttentive(nbr)))
+//         continue;
+
+//       edt_env_->sdf_map_->indexToPos(nbr, pos);
+//       if (pos[2] < 0.2) continue;  // Remove noise close to ground
+//       expanded.push_back(pos);
+//       cell_queue.push(nbr);
+//       // frontier_flag_[adr] = 1;
+//     }
+    
+
+//   }
+//   if (expanded.size() > 30) {
+//     // Compute detailed info
+//     Object object;
+//     object.cells_ = expanded;
+//     // computeFrontierInfo(object);
+//     objects.push_back(objects);
+//   }
+// }
+
+
 void FrontierFinder::expandFrontier(
     const Eigen::Vector3i& first /* , const int& depth, const int& parent_id */) {
   // std::cout << "depth: " << depth << std::endl;
@@ -867,6 +941,15 @@ inline bool FrontierFinder::isNeighborUnknown(const Eigen::Vector3i& voxel) {
   }
   return false;
 }
+
+// inline bool FrontierFinder::isNeighborAttentive(const Eigen::Vector3i& voxel) {
+//   // At least one neighbor is attentive
+//   auto nbrs = sixNeighbors(voxel);
+//   for (auto nbr : nbrs) {
+//     if (edt_env_->sdf_map_->attention_buffer_[toadr(nbr)] > 0) return true;
+//   }
+//   return false;
+// }
 
 inline int FrontierFinder::toadr(const Eigen::Vector3i& idx) {
   return edt_env_->sdf_map_->toAddress(idx);

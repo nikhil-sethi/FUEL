@@ -48,7 +48,7 @@ public:
   void boundBox(Eigen::Vector3d& low, Eigen::Vector3d& up);
   int getOccupancy(const Eigen::Vector3d& pos);
   int getOccupancy(const Eigen::Vector3i& id);
-  int SDFMap::getOccupancy(const int& id);
+  int getOccupancy(const int& id);
 
   float getAttention(const Eigen::Vector3i& id);
 

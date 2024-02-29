@@ -4,7 +4,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <visualization_msgs/Marker.h>
-
+#include <common_msgs/uint8List.h>
 #include <fstream>
 
 namespace fast_planner {
@@ -86,7 +86,10 @@ void MapROS::init() {
   att_3d_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/attention_map/3d", 10);
   att_sub_ = node_.subscribe("/iris_depth_camera/attention_map/2d", 10, &MapROS::attCallback, this);
   att_image_.reset(new cv::Mat);
-
+  
+  occ_pub_ = node_.advertise<common_msgs::uint8List>("/occupancy_map/", 10);
+  occupancy_buffer_light = vector<uint8_t>(map_->md_->occupancy_buffer_.size(), 0); 
+  occ_timer_ = node_.createTimer(ros::Duration(0.05), &MapROS::occupancyTimer, this);
 }
 
 void MapROS::visCallback(const ros::TimerEvent& e) {
@@ -317,6 +320,18 @@ void MapROS::publishMapAll() {
   //               "curve1.txt",
   //     ios::app);
   // file << "time:" << time_now << ",vol:" << known_volumn << std::endl;
+}
+
+void MapROS::occupancyTimer(const ros::TimerEvent& e){
+  
+  for (int i=0; i<map_->md_->occupancy_buffer_.size(); ++i){
+    occupancy_buffer_light[i] = map_->getOccupancy(i);
+  }
+  common_msgs::uint8List occ_msg;
+
+  occ_msg.data = occupancy_buffer_light;
+  occ_pub_.publish(occ_msg);
+  
 }
 
 void MapROS::publishMapLocal() {
