@@ -43,6 +43,7 @@ private:
   ros::Publisher frontier_pub_;   // 4, frontier searching
   ros::Publisher yaw_pub_;        // 5, yaw trajectory
   ros::Publisher viewpoint_pub_;  // 6, viewpoint planning
+  ros::Publisher objects_pub_;  // 7, objects
   vector<ros::Publisher> pubs_;   //
 
   int last_topo_path1_num_;

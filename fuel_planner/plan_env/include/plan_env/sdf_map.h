@@ -37,6 +37,7 @@ public:
 
   void posToIndex(const Eigen::Vector3d& pos, Eigen::Vector3i& id);
   void indexToPos(const Eigen::Vector3i& id, Eigen::Vector3d& pos);
+  void indexToPos(const int& idx, Eigen::Vector3d& pos);
   void boundIndex(Eigen::Vector3i& id);
   int toAddress(const Eigen::Vector3i& id);
   int toAddress(const int& x, const int& y, const int& z);
@@ -47,6 +48,7 @@ public:
   void boundBox(Eigen::Vector3d& low, Eigen::Vector3d& up);
   int getOccupancy(const Eigen::Vector3d& pos);
   int getOccupancy(const Eigen::Vector3i& id);
+  int SDFMap::getOccupancy(const int& id);
 
   float getAttention(const Eigen::Vector3i& id);
 
@@ -65,7 +67,7 @@ public:
   void getUpdatedBox(Eigen::Vector3d& bmin, Eigen::Vector3d& bmax, bool reset = false);
   double getResolution();
   int getVoxelNum();
-
+  void processAttentionMap();
 private:
   void clearAndInflateLocalMap();
   void inflatePoint(const Eigen::Vector3i& pt, int step, vector<Eigen::Vector3i>& pts);
@@ -140,6 +142,15 @@ inline void SDFMap::indexToPos(const Eigen::Vector3i& id, Eigen::Vector3d& pos) 
     pos(i) = (id(i) + 0.5) * mp_->resolution_ + mp_->map_origin_(i);
 }
 
+inline void SDFMap::indexToPos(const int& idx, Eigen::Vector3d& pos) {
+  Eigen::Vector3i id;
+  id[0] = floor(idx/(mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2)));
+  id[1] = floor((idx - id[0]*mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2))/(mp_->map_voxel_num_(2)));
+  id[2] = idx - id[0]*mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2) - id[1]*mp_->map_voxel_num_(2);
+  indexToPos(id, pos);
+}
+
+
 inline void SDFMap::boundIndex(Eigen::Vector3i& id) {
   Eigen::Vector3i id1;
   id1(0) = max(min(id(0), mp_->map_voxel_num_(0) - 1), 0);
@@ -197,6 +208,14 @@ inline void SDFMap::boundBox(Eigen::Vector3d& low, Eigen::Vector3d& up) {
     low[i] = max(low[i], mp_->box_mind_[i]);
     up[i] = min(up[i], mp_->box_maxd_[i]);
   }
+}
+
+inline int SDFMap::getOccupancy(const int& id) {
+  // if (!isInMap(id)) return -1;
+  double occ = md_->occupancy_buffer_[id];
+  if (occ < mp_->clamp_min_log_ - 1e-3) return UNKNOWN;
+  if (occ > mp_->min_occupancy_log_) return OCCUPIED;
+  return FREE;
 }
 
 inline int SDFMap::getOccupancy(const Eigen::Vector3i& id) {
