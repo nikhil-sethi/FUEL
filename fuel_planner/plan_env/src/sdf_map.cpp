@@ -9,24 +9,24 @@ SDFMap::SDFMap() {
 SDFMap::~SDFMap() {
 }
 
-void SDFMap::initMap(ros::NodeHandle& nh) {
+// separated from init so that other nodes can use this class
+void SDFMap::setParams(ros::NodeHandle& nh, std::string ns){
   mp_.reset(new MapParam);
   md_.reset(new MapData);
-  mr_.reset(new MapROS);
 
   // Params of map properties
   double x_size, y_size, z_size;
-  nh.param("sdf_map/resolution", mp_->resolution_, -1.0);
-  nh.param("sdf_map/map_size_x", x_size, -1.0);
-  nh.param("sdf_map/map_size_y", y_size, -1.0);
-  nh.param("sdf_map/map_size_z", z_size, -1.0);
-  nh.param("sdf_map/obstacles_inflation", mp_->obstacles_inflation_, -1.0);
-  nh.param("sdf_map/local_bound_inflate", mp_->local_bound_inflate_, 1.0);
-  nh.param("sdf_map/local_map_margin", mp_->local_map_margin_, 1);
-  nh.param("sdf_map/ground_height", mp_->ground_height_, 1.0);
-  nh.param("sdf_map/default_dist", mp_->default_dist_, 5.0);
-  nh.param("sdf_map/optimistic", mp_->optimistic_, true);
-  nh.param("sdf_map/signed_dist", mp_->signed_dist_, false);
+  nh.param(ns + "sdf_map/resolution", mp_->resolution_, -1.0);
+  nh.param(ns + "sdf_map/map_size_x", x_size, -1.0);
+  nh.param(ns + "sdf_map/map_size_y", y_size, -1.0);
+  nh.param(ns + "sdf_map/map_size_z", z_size, -1.0);
+  nh.param(ns + "sdf_map/obstacles_inflation", mp_->obstacles_inflation_, -1.0);
+  nh.param(ns + "sdf_map/local_bound_inflate", mp_->local_bound_inflate_, 1.0);
+  nh.param(ns + "sdf_map/local_map_margin", mp_->local_map_margin_, 1);
+  nh.param(ns + "sdf_map/ground_height", mp_->ground_height_, 1.0);
+  nh.param(ns + "sdf_map/default_dist", mp_->default_dist_, 5.0);
+  nh.param(ns + "sdf_map/optimistic", mp_->optimistic_, true);
+  nh.param(ns + "sdf_map/signed_dist", mp_->signed_dist_, false);
 
   mp_->local_bound_inflate_ = max(mp_->resolution_, mp_->local_bound_inflate_);
   mp_->resolution_inv_ = 1 / mp_->resolution_;
@@ -38,13 +38,13 @@ void SDFMap::initMap(ros::NodeHandle& nh) {
   mp_->map_max_boundary_ = mp_->map_origin_ + mp_->map_size_;
 
   // Params of raycasting-based fusion
-  nh.param("sdf_map/p_hit", mp_->p_hit_, 0.70);
-  nh.param("sdf_map/p_miss", mp_->p_miss_, 0.35);
-  nh.param("sdf_map/p_min", mp_->p_min_, 0.12);
-  nh.param("sdf_map/p_max", mp_->p_max_, 0.97);
-  nh.param("sdf_map/p_occ", mp_->p_occ_, 0.80);
-  nh.param("sdf_map/max_ray_length", mp_->max_ray_length_, -0.1);
-  nh.param("sdf_map/virtual_ceil_height", mp_->virtual_ceil_height_, -0.1);
+  nh.param(ns + "sdf_map/p_hit", mp_->p_hit_, 0.70);
+  nh.param(ns + "sdf_map/p_miss", mp_->p_miss_, 0.35);
+  nh.param(ns + "sdf_map/p_min", mp_->p_min_, 0.12);
+  nh.param(ns + "sdf_map/p_max", mp_->p_max_, 0.97);
+  nh.param(ns + "sdf_map/p_occ", mp_->p_occ_, 0.80);
+  nh.param(ns + "sdf_map/max_ray_length", mp_->max_ray_length_, -0.1);
+  nh.param(ns + "sdf_map/virtual_ceil_height", mp_->virtual_ceil_height_, -0.1);
 
   auto logit = [](const double& x) { return log(x / (1 - x)); };
   mp_->prob_hit_log_ = logit(mp_->p_hit_);
@@ -60,7 +60,7 @@ void SDFMap::initMap(ros::NodeHandle& nh) {
   // Initialize data buffer of map
   int buffer_size = mp_->map_voxel_num_(0) * mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2);
   md_->occupancy_buffer_ = vector<double>(buffer_size, mp_->clamp_min_log_ - mp_->unknown_flag_);
-  md_->occupancy_buffer_inflate_ = vector<char>(buffer_size, 0);
+  md_->occupancy_buffer_inflate_ = vector<uint8_t>(buffer_size, 0);
   md_->distance_buffer_neg_ = vector<double>(buffer_size, mp_->default_dist_);
   md_->distance_buffer_ = vector<double>(buffer_size, mp_->default_dist_);
   md_->count_hit_and_miss_ = vector<short>(buffer_size, 0);
@@ -70,6 +70,9 @@ void SDFMap::initMap(ros::NodeHandle& nh) {
   md_->flag_visited_ = vector<char>(buffer_size, -1);
   md_->tmp_buffer1_ = vector<double>(buffer_size, 0);
   md_->tmp_buffer2_ = vector<double>(buffer_size, 0);
+
+  md_->attention_buffer_ = vector<float>(buffer_size, 0);
+
   md_->raycast_num_ = 0;
   md_->reset_updated_box_ = true;
   md_->update_min_ = md_->update_max_ = Eigen::Vector3d(0, 0, 0);
@@ -77,11 +80,19 @@ void SDFMap::initMap(ros::NodeHandle& nh) {
   // Try retriving bounding box of map, set box to map size if not specified
   vector<string> axis = { "x", "y", "z" };
   for (int i = 0; i < 3; ++i) {
-    nh.param("sdf_map/box_min_" + axis[i], mp_->box_mind_[i], mp_->map_min_boundary_[i]);
-    nh.param("sdf_map/box_max_" + axis[i], mp_->box_maxd_[i], mp_->map_max_boundary_[i]);
+    nh.param(ns + "sdf_map/box_min_" + axis[i], mp_->box_mind_[i], mp_->map_min_boundary_[i]);
+    nh.param(ns + "sdf_map/box_max_" + axis[i], mp_->box_maxd_[i], mp_->map_max_boundary_[i]);
   }
   posToIndex(mp_->box_mind_, mp_->box_min_);
   posToIndex(mp_->box_maxd_, mp_->box_max_);
+
+}
+
+void SDFMap::initMap(ros::NodeHandle& nh) {
+  // mp_.reset(new MapParam);
+  // md_.reset(new MapData);
+  setParams(nh);
+  mr_.reset(new MapROS);
 
   // Initialize ROS wrapper
   mr_->setMap(this);
@@ -445,6 +456,8 @@ void SDFMap::clearAndInflateLocalMap() {
     for (int y = md_->local_bound_min_(1); y <= md_->local_bound_max_(1); ++y)
       for (int z = md_->local_bound_min_(2); z <= md_->local_bound_max_(2); ++z) {
         md_->occupancy_buffer_inflate_[toAddress(x, y, z)] = 0;
+        // if (md_->occupancy_buffer_[toAddress(x, y, z)] < mp_->min_occupancy_log_) md_->attention_buffer_[toAddress(x, y, z)] *=0.1;
+
       }
 
   // inflate newest occpuied cells

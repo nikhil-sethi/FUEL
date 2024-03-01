@@ -29,6 +29,10 @@ PlanningVisualization::PlanningVisualization(ros::NodeHandle& nh) {
   viewpoint_pub_ = node.advertise<visualization_msgs::Marker>("/planning_vis/viewpoints", 1000);
   pubs_.push_back(viewpoint_pub_);
 
+  objects_pub_ = node.advertise<visualization_msgs::Marker>("/map_vis/objects/", 100);
+  pubs_.push_back(objects_pub_);
+
+
   last_topo_path1_num_ = 0;
   last_topo_path2_num_ = 0;
   last_bspline_phase1_num_ = 0;

@@ -18,6 +18,7 @@ class Mat;
 }
 
 class RayCaster;
+class AttentionMap;
 
 namespace fast_planner {
 struct MapParam;
@@ -37,6 +38,7 @@ public:
 
   void posToIndex(const Eigen::Vector3d& pos, Eigen::Vector3i& id);
   void indexToPos(const Eigen::Vector3i& id, Eigen::Vector3d& pos);
+  void indexToPos(const int& idx, Eigen::Vector3d& pos);
   void boundIndex(Eigen::Vector3i& id);
   int toAddress(const Eigen::Vector3i& id);
   int toAddress(const int& x, const int& y, const int& z);
@@ -47,6 +49,10 @@ public:
   void boundBox(Eigen::Vector3d& low, Eigen::Vector3d& up);
   int getOccupancy(const Eigen::Vector3d& pos);
   int getOccupancy(const Eigen::Vector3i& id);
+  int getOccupancy(const int& id);
+
+  float getAttention(const Eigen::Vector3i& id);
+
   void setOccupied(const Eigen::Vector3d& pos, const int& occ = 1);
   int getInflateOccupancy(const Eigen::Vector3d& pos);
   int getInflateOccupancy(const Eigen::Vector3i& id);
@@ -62,7 +68,8 @@ public:
   void getUpdatedBox(Eigen::Vector3d& bmin, Eigen::Vector3d& bmax, bool reset = false);
   double getResolution();
   int getVoxelNum();
-
+  void processAttentionMap();
+  void setParams(ros::NodeHandle& nh, std::string ns="");
 private:
   void clearAndInflateLocalMap();
   void inflatePoint(const Eigen::Vector3i& pt, int step, vector<Eigen::Vector3i>& pts);
@@ -77,6 +84,7 @@ private:
   unique_ptr<RayCaster> caster_;
 
   friend MapROS;
+  friend class ::AttentionMap; // in global namespace
 
 public:
   typedef std::shared_ptr<SDFMap> Ptr;
@@ -107,7 +115,7 @@ struct MapParam {
 struct MapData {
   // main map data, occupancy of each voxel and Euclidean distance
   std::vector<double> occupancy_buffer_;
-  std::vector<char> occupancy_buffer_inflate_;
+  std::vector<uint8_t> occupancy_buffer_inflate_;
   std::vector<double> distance_buffer_neg_;
   std::vector<double> distance_buffer_;
   std::vector<double> tmp_buffer1_;
@@ -123,6 +131,8 @@ struct MapData {
   bool reset_updated_box_;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  std::vector<float> attention_buffer_;
 };
 
 inline void SDFMap::posToIndex(const Eigen::Vector3d& pos, Eigen::Vector3i& id) {
@@ -134,6 +144,15 @@ inline void SDFMap::indexToPos(const Eigen::Vector3i& id, Eigen::Vector3d& pos) 
   for (int i = 0; i < 3; ++i)
     pos(i) = (id(i) + 0.5) * mp_->resolution_ + mp_->map_origin_(i);
 }
+
+inline void SDFMap::indexToPos(const int& idx, Eigen::Vector3d& pos) {
+  Eigen::Vector3i id;
+  id[0] = floor(idx/(mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2)));
+  id[1] = floor((idx - id[0]*mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2))/(mp_->map_voxel_num_(2)));
+  id[2] = idx - id[0]*mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2) - id[1]*mp_->map_voxel_num_(2);
+  indexToPos(id, pos);
+}
+
 
 inline void SDFMap::boundIndex(Eigen::Vector3i& id) {
   Eigen::Vector3i id1;
@@ -194,6 +213,14 @@ inline void SDFMap::boundBox(Eigen::Vector3d& low, Eigen::Vector3d& up) {
   }
 }
 
+inline int SDFMap::getOccupancy(const int& id) {
+  // if (!isInMap(id)) return -1;
+  double occ = md_->occupancy_buffer_[id];
+  if (occ < mp_->clamp_min_log_ - 1e-3) return UNKNOWN;
+  if (occ > mp_->min_occupancy_log_) return OCCUPIED;
+  return FREE;
+}
+
 inline int SDFMap::getOccupancy(const Eigen::Vector3i& id) {
   if (!isInMap(id)) return -1;
   double occ = md_->occupancy_buffer_[toAddress(id)];
@@ -206,6 +233,11 @@ inline int SDFMap::getOccupancy(const Eigen::Vector3d& pos) {
   Eigen::Vector3i id;
   posToIndex(pos, id);
   return getOccupancy(id);
+}
+
+inline float SDFMap::getAttention(const Eigen::Vector3i& id) {
+  if (!isInMap(id)) return -1;
+  return md_->attention_buffer_[toAddress(id)];
 }
 
 inline void SDFMap::setOccupied(const Eigen::Vector3d& pos, const int& occ) {
