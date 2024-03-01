@@ -18,6 +18,7 @@ class Mat;
 }
 
 class RayCaster;
+class AttentionMap;
 
 namespace fast_planner {
 struct MapParam;
@@ -68,6 +69,7 @@ public:
   double getResolution();
   int getVoxelNum();
   void processAttentionMap();
+  void setParams(ros::NodeHandle& nh, std::string ns="");
 private:
   void clearAndInflateLocalMap();
   void inflatePoint(const Eigen::Vector3i& pt, int step, vector<Eigen::Vector3i>& pts);
@@ -82,6 +84,7 @@ private:
   unique_ptr<RayCaster> caster_;
 
   friend MapROS;
+  friend class ::AttentionMap; // in global namespace
 
 public:
   typedef std::shared_ptr<SDFMap> Ptr;
@@ -112,7 +115,7 @@ struct MapParam {
 struct MapData {
   // main map data, occupancy of each voxel and Euclidean distance
   std::vector<double> occupancy_buffer_;
-  std::vector<char> occupancy_buffer_inflate_;
+  std::vector<uint8_t> occupancy_buffer_inflate_;
   std::vector<double> distance_buffer_neg_;
   std::vector<double> distance_buffer_;
   std::vector<double> tmp_buffer1_;

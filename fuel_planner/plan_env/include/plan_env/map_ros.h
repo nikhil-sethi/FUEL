@@ -55,6 +55,7 @@ private:
   ros::Publisher att_3d_pub_;  // publish 3d attention map
   bool attention_needs_update_ = false;
   ros::Publisher occ_pub_;  // publish occupancy buffer
+  ros::Publisher occ_inflate_pub_;  // publish inflated occupancy buffer
   ros::Timer occ_timer_;
   vector<uint8_t> occupancy_buffer_light;
   void occupancyTimer(const ros::TimerEvent& e); // publishing occupancy buffer

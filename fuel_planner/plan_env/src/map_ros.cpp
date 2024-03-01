@@ -87,7 +87,9 @@ void MapROS::init() {
   att_sub_ = node_.subscribe("/iris_depth_camera/attention_map/2d", 10, &MapROS::attCallback, this);
   att_image_.reset(new cv::Mat);
   
-  occ_pub_ = node_.advertise<common_msgs::uint8List>("/occupancy_map/", 10);
+  occ_pub_ = node_.advertise<common_msgs::uint8List>("/occupancy_buffer/", 10);
+  occ_inflate_pub_ = node_.advertise<common_msgs::uint8List>("/occupancy_buffer_inflate/", 10);
+  
   occupancy_buffer_light = vector<uint8_t>(map_->md_->occupancy_buffer_.size(), 0); 
   occ_timer_ = node_.createTimer(ros::Duration(0.05), &MapROS::occupancyTimer, this);
 }
@@ -328,9 +330,12 @@ void MapROS::occupancyTimer(const ros::TimerEvent& e){
     occupancy_buffer_light[i] = map_->getOccupancy(i);
   }
   common_msgs::uint8List occ_msg;
-
   occ_msg.data = occupancy_buffer_light;
   occ_pub_.publish(occ_msg);
+
+  common_msgs::uint8List occ_inflate_msg;
+  occ_inflate_msg.data = map_->md_->occupancy_buffer_inflate_;
+  occ_inflate_pub_.publish(occ_inflate_msg);
   
 }
 
