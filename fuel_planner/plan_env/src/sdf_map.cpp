@@ -58,7 +58,7 @@ void SDFMap::setParams(ros::NodeHandle& nh, std::string ns){
        << ", thresh: " << mp_->min_occupancy_log_ << endl;
 
   // Initialize data buffer of map
-  int buffer_size = mp_->map_voxel_num_(0) * mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2);
+  buffer_size = mp_->map_voxel_num_(0) * mp_->map_voxel_num_(1) * mp_->map_voxel_num_(2);
   md_->occupancy_buffer_ = vector<double>(buffer_size, mp_->clamp_min_log_ - mp_->unknown_flag_);
   md_->occupancy_buffer_inflate_ = vector<uint8_t>(buffer_size, 0);
   md_->distance_buffer_neg_ = vector<double>(buffer_size, mp_->default_dist_);

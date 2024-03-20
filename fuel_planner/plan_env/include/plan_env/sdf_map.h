@@ -70,6 +70,9 @@ public:
   int getVoxelNum();
   void processAttentionMap();
   void setParams(ros::NodeHandle& nh, std::string ns="");
+
+  int buffer_size;
+
 private:
   void clearAndInflateLocalMap();
   void inflatePoint(const Eigen::Vector3i& pt, int step, vector<Eigen::Vector3i>& pts);
