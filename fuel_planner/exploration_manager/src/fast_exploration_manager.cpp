@@ -247,7 +247,7 @@ int FastExplorationManager::planExploreMotion(
     planner_manager_->planExploreTraj(ed_->path_next_goal_, vel, acc, time_lb);
     ed_->next_goal_ = next_pos;
 
-  } else if (len > radius_far) {
+  } else if (len > radius_far) {  // Very rarely happens for our use case. The arena is very small
     // Next viewpoint is far away, select intermediate goal on geometric path (this also deal with
     // dead end)
     std::cout << "Far goal." << std::endl;
@@ -273,9 +273,9 @@ int FastExplorationManager::planExploreMotion(
             pos, vel, acc, ed_->next_goal_, Vector3d(0, 0, 0), time_lb))
       return FAIL;
   }
-
-  if (planner_manager_->local_data_.position_traj_.getTimeSum() < time_lb - 0.1)
-    ROS_ERROR("Lower bound not satified!");
+  double planned_time = planner_manager_->local_data_.position_traj_.getTimeSum();
+  if (planned_time < (time_lb - 0.1))
+    ROS_ERROR("Lower bound not satified! planned: %f , estimated: %f", planned_time, time_lb-0.1);
 
   planner_manager_->planYawExplore(yaw, next_yaw, true, ep_->relax_time_);
 

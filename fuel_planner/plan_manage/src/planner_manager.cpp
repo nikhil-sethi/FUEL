@@ -81,8 +81,8 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
 
   if (use_active_perception) {
     frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
-    heading_planner_.reset(new HeadingPlanner(nh));
-    heading_planner_->setMap(sdf_map_);
+    // heading_planner_.reset(new HeadingPlanner(nh));
+    // heading_planner_->setMap(sdf_map_);
     visib_util_.reset(new VisibilityUtil(nh));
     visib_util_->setEDTEnvironment(edt_environment_);
     plan_data_.view_cons_.idx_ = -1;
@@ -824,9 +824,10 @@ void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const 
   yaw.block<3, 1>(seg_num, 0) = states2pts * end_yaw3d;
 
   // Debug rapid change of yaw
-  if (fabs(start_yaw3d[0] - end_yaw3d[0]) >= M_PI) {
+  if (fabs(start_yaw3d[0] - end_yaw3d[0]) >= (0.75*M_PI)) {
     ROS_ERROR("Yaw change rapidly!");
     std::cout << "start yaw: " << start_yaw3d[0] << ", " << end_yaw3d[0] << std::endl;
+    // end_yaw3d[0] /= 2;
   }
 
   // // Interpolate start and end value for smoothness

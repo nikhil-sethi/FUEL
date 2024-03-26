@@ -86,7 +86,9 @@ void MapROS::init() {
   att_3d_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/attention_map/3d", 10);
   att_sub_ = node_.subscribe("/iris_depth_camera/attention_map/2d", 10, &MapROS::attCallback, this);
   att_image_.reset(new cv::Mat);
-  
+  att_image_.reset(new cv::Mat(480,848, CV_8UC1));
+  (*att_image_).setTo(cv::Scalar::all(0));
+
   occ_pub_ = node_.advertise<common_msgs::uint8List>("/occupancy_buffer/", 10);
   occ_inflate_pub_ = node_.advertise<common_msgs::uint8List>("/occupancy_buffer_inflate/", 10);
   

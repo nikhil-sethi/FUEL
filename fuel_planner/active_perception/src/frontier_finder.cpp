@@ -217,7 +217,7 @@ void FrontierFinder::expandFrontier(
     for (auto nbr : nbrs) {
       // Qualified cell should be inside bounding box and frontier cell not clustered
       int adr = toadr(nbr);
-      if (frontier_flag_[adr] == 1 || !edt_env_->sdf_map_->isInBox(nbr) ||
+      if (!edt_env_->sdf_map_->isInBox(nbr) || frontier_flag_[adr] == 1 ||
           !(knownfree(nbr) && isNeighborUnknown(nbr)))
         continue;
 
@@ -504,7 +504,7 @@ void FrontierFinder::getTopViewpointsInfo(
   averages.clear();
   for (auto frontier : frontiers_) {
     bool no_view = true;
-    for (auto view : frontier.viewpoints_) {
+    for (auto view : frontier.viewpoints_) { // this viewpoint list is already sorted by the coverage fraction. 
       // Retrieve the first viewpoint that is far enough and has highest coverage
       if ((view.pos_ - cur_pos).norm() < min_candidate_dist_) continue;
       points.push_back(view.pos_);
