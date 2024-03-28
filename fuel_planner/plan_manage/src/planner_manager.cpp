@@ -774,7 +774,12 @@ void FastPlannerManager::planYaw(const Eigen::Vector3d& start_yaw) {
 void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const double& end_yaw,
     bool lookfwd, const double& relax_time) {
   const int seg_num = 12;
-  double dt_yaw = local_data_.duration_ / seg_num;  // time of B-spline segment
+  double time = local_data_.duration_;
+  
+  double end_yaw_clipped = end_yaw;
+  findThresholdTarget(start_yaw[0], end_yaw_clipped, time);
+  double dt_yaw =  time/ seg_num;  // time of B-spline segment
+
   Eigen::Vector3d start_yaw3d = start_yaw;
   std::cout << "dt_yaw: " << dt_yaw << ", start yaw: " << start_yaw3d.transpose()
             << ", end: " << end_yaw << std::endl;
@@ -782,6 +787,24 @@ void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const 
   while (start_yaw3d[0] < -M_PI) start_yaw3d[0] += 2 * M_PI;
   while (start_yaw3d[0] > M_PI) start_yaw3d[0] -= 2 * M_PI;
   double last_yaw = start_yaw3d[0];
+
+  // double end_yaw_ = end_yaw;
+  // calcNextYaw(last_yaw, end_yaw_);
+  // // calcNextYaw(last_yaw, end_yaw);
+
+  // double diff = fabs(start_yaw[0] - end_yaw);
+  // double diff_wrap = min(diff, 2*M_PI - diff);
+  
+  // while (diff_wrap<0.75*M_PI){
+  //   time *= 0.8;
+  //   dt_yaw =  time/ seg_num;
+    
+  //   ROS_ERROR("Yaw exceeded. start: %f old: %f new: %f", start_yaw3d[0], end_yaw_, 0.8*end_yaw_);
+  //   end_yaw_ *= 0.8;
+  //   diff = fabs(start_yaw[0] - end_yaw_);
+  //   diff_wrap = min(diff, 2*M_PI - diff);
+  
+  // }
 
   // Yaw traj control points
   Eigen::MatrixXd yaw(seg_num + 3, 1);
@@ -802,7 +825,7 @@ void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const 
     for (int i = 1; i < seg_num - relax_num; ++i) {
       double tc = i * dt_yaw;
       Eigen::Vector3d pc = local_data_.position_traj_.evaluateDeBoorT(tc);
-      double tf = min(local_data_.duration_, tc + forward_t);
+      double tf = min(time, tc + forward_t);
       Eigen::Vector3d pf = local_data_.position_traj_.evaluateDeBoorT(tf);
       Eigen::Vector3d pd = pf - pc;
       Eigen::Vector3d waypt;
@@ -818,8 +841,9 @@ void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const 
       waypt_idx.push_back(i);
     }
   }
+
   // Final state
-  Eigen::Vector3d end_yaw3d(end_yaw, 0, 0);
+  Eigen::Vector3d end_yaw3d(end_yaw_clipped, 0, 0);
   calcNextYaw(last_yaw, end_yaw3d(0));
   yaw.block<3, 1>(seg_num, 0) = states2pts * end_yaw3d;
 
@@ -827,7 +851,11 @@ void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const 
   if (fabs(start_yaw3d[0] - end_yaw3d[0]) >= (0.75*M_PI)) {
     ROS_ERROR("Yaw change rapidly!");
     std::cout << "start yaw: " << start_yaw3d[0] << ", " << end_yaw3d[0] << std::endl;
-    // end_yaw3d[0] /= 2;
+    // last_yaw = end_yaw*0.5;
+    // Eigen::Vector3d end_yaw3d(end_yaw_clipped, 0, 0);
+    // calcNextYaw(last_yaw, end_yaw3d(0));
+    // yaw.block<3, 1>(seg_num, 0) = states2pts * end_yaw3d;
+
   }
 
   // // Interpolate start and end value for smoothness
@@ -857,9 +885,29 @@ void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const 
 
   // Update traj info
   local_data_.yaw_traj_.setUniformBspline(yaw, 3, dt_yaw);
-  local_data_.yawdot_traj_ = local_data_.yaw_traj_.getDerivative();
+  local_data_.yawdot_traj_ = local_data_.yaw_traj_.getDerivative(); 
   local_data_.yawdotdot_traj_ = local_data_.yawdot_traj_.getDerivative();
   plan_data_.dt_yaw_ = dt_yaw;
+
+  // check sanity
+  double max_yd = -100.0;
+  double max_ydd = -100.0;
+
+  // find maximum angular velocity
+  for (int i = 0; i < seg_num; i++){
+    double tc = i*dt_yaw;
+    double yd = local_data_.yawdot_traj_.evaluateDeBoorT(tc)[0];
+    double ydd = local_data_.yawdotdot_traj_.evaluateDeBoorT(tc)[0];
+
+    if (yd > max_yd)
+      max_yd = yd;
+    if (ydd > max_ydd)
+      max_ydd = ydd;
+  }
+  
+  ROS_ERROR("Maximum angular velocity: %f", max_yd);
+  ROS_ERROR("Maximum angular acceleration: %f", max_ydd);
+
 
   // plan_data_.path_yaw_ = path;
   // plan_data_.dt_yaw_path_ = dt_yaw * subsp;
@@ -884,5 +932,43 @@ void FastPlannerManager::calcNextYaw(const double& last_yaw, double& yaw) {
     yaw = last_yaw + diff + 2 * M_PI;
   }
 }
+
+
+
+// Function to calculate the difference between two angles
+double FastPlannerManager::angleDifference(double currentYaw, double targetYaw) {
+    double diff = targetYaw - currentYaw;
+    while (diff < -M_PI) diff += 2 * M_PI;
+    while (diff > M_PI) diff -= 2 * M_PI;
+    return diff;
+}
+
+void FastPlannerManager::findThresholdTarget(double currentYaw, double& targetYaw, double& time){
+
+    // Ensure both angles are within the range -pi to pi
+    while (currentYaw < -M_PI) currentYaw += 2 * M_PI;
+    while (currentYaw > M_PI) currentYaw -= 2 * M_PI;
+    while (targetYaw < -M_PI) targetYaw += 2 * M_PI;
+    while (targetYaw > M_PI) targetYaw -= 2 * M_PI;
+
+    double diff = angleDifference(currentYaw, targetYaw);
+
+    // Main loop to adjust the target yaw until it's within the threshold
+    while (std::abs(diff) > 0.75*M_PI) {
+        // Adjust target yaw
+        diff = angleDifference(currentYaw, targetYaw);
+        // targetYaw *= 0.8;
+        if (std::abs(diff) > 0.75*M_PI) {
+            targetYaw -= (diff > 0) ? 0.1 : -0.1;
+            time *=0.9;
+        }
+        // Ensure targetYaw stays within the range -pi to pi
+        while (targetYaw < -M_PI) targetYaw += 2 * M_PI;
+        while (targetYaw > M_PI) targetYaw -= 2 * M_PI;
+
+        ROS_ERROR_STREAM("Current Yaw: " << currentYaw << ", Target Yaw: " << targetYaw << std::endl);
+    }
+}
+
 
 }  // namespace fast_planner
