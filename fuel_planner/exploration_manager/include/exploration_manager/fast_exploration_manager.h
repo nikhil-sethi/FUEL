@@ -5,6 +5,9 @@
 #include <Eigen/Eigen>
 #include <memory>
 #include <vector>
+#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 using Eigen::Vector3d;
 using std::shared_ptr;
@@ -44,6 +47,10 @@ public:
 private:
   shared_ptr<EDTEnvironment> edt_environment_;
   shared_ptr<SDFMap> sdf_map_;
+  std::vector<geometry_msgs::Pose> target_vpts;
+  ros::Subscriber vpts_sub, custom_goal_pose_sub;
+  geometry_msgs::Pose custom_goal_pose;
+  bool CUSTOM_GOAL = false;
 
   // Find optimal tour for coarse viewpoints of all frontiers
   void findGlobalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
@@ -55,6 +62,8 @@ private:
                        vector<Vector3d>& refined_pts, vector<double>& refined_yaws);
 
   void shortenPath(vector<Vector3d>& path);
+  void targetViewpointsCallback(const geometry_msgs::PoseArray& msg);
+  void customPoseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg);
 
 public:
   typedef shared_ptr<FastExplorationManager> Ptr;
