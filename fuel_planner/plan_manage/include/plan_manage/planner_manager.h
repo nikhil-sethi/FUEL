@@ -46,6 +46,9 @@ public:
   bool checkTrajCollision(double& distance);
   void calcNextYaw(const double& last_yaw, double& yaw);
 
+  void findThresholdTarget(double currentYaw, double& targetYaw, double& time);
+  double angleDifference(double currentYaw, double targetYaw);
+
   PlanParameters pp_;
   LocalTrajData local_data_;
   GlobalTrajData global_data_;

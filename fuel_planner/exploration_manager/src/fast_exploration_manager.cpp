@@ -83,7 +83,7 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   // ofstream fout;
   // fout.open("/home/boboyu/Desktop/RAL_Time/frontier.txt");
   // fout.close();
-}
+  }
 
 int FastExplorationManager::planExploreMotion(
     const Vector3d& pos, const Vector3d& vel, const Vector3d& acc, const Vector3d& yaw) {
@@ -238,8 +238,8 @@ int FastExplorationManager::planExploreMotion(
   ed_->path_next_goal_ = planner_manager_->path_finder_->getPath();
   shortenPath(ed_->path_next_goal_);
 
-  const double radius_far = 5.0;
-  const double radius_close = 1.5;
+  const double radius_far = 3.0;
+  const double radius_close = 1.0;
   const double len = Astar::pathLength(ed_->path_next_goal_);
   if (len < radius_close) {
     // Next viewpoint is very close, no need to search kinodynamic path, just use waypoints-based
@@ -252,6 +252,8 @@ int FastExplorationManager::planExploreMotion(
     // dead end)
     std::cout << "Far goal." << std::endl;
     double len2 = 0.0;
+
+    // cut the path until the cumulative path length stays within the max radius
     vector<Eigen::Vector3d> truncated_path = { ed_->path_next_goal_.front() };
     for (int i = 1; i < ed_->path_next_goal_.size() && len2 < radius_far; ++i) {
       auto cur_pt = ed_->path_next_goal_[i];
@@ -259,8 +261,8 @@ int FastExplorationManager::planExploreMotion(
       truncated_path.push_back(cur_pt);
     }
     ed_->next_goal_ = truncated_path.back();
-    planner_manager_->planExploreTraj(truncated_path, vel, acc, time_lb);
-    // if (!planner_manager_->kinodynamicReplan(
+        planner_manager_->planExploreTraj(truncated_path, vel, acc, time_lb);
+        // if (!planner_manager_->kinodynamicReplan(
     //         pos, vel, acc, ed_->next_goal_, Vector3d(0, 0, 0), time_lb))
     //   return FAIL;
     // ed_->kino_path_ = planner_manager_->kino_path_finder_->getKinoTraj(0.02);
@@ -297,7 +299,7 @@ void FastExplorationManager::shortenPath(vector<Vector3d>& path) {
     return;
   }
   // Shorten the tour, only critical intermediate points are reserved.
-  const double dist_thresh = 3.0;
+  const double dist_thresh = 2.0;
   vector<Vector3d> short_tour = { path.front() };
   for (int i = 1; i < path.size() - 1; ++i) {
     if ((path[i] - short_tour.back()).norm() > dist_thresh)

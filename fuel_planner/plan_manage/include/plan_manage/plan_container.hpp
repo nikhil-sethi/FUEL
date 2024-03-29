@@ -118,6 +118,7 @@ struct PlanParameters {
   double accept_vel_, accept_acc_;
 
   double max_yawdot_;
+  double relax_time1_, relax_time2_;
   double local_traj_len_;  // local replanning trajectory length
   double ctrl_pt_dist;     // distance between adjacient B-spline control points
   int bspline_degree_;
