@@ -14,7 +14,7 @@
 #include <plan_manage/planner_manager.h>
 
 #include <exploration_manager/expl_data.h>
-
+#include <geometry_msgs/PoseArray.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <visualization_msgs/Marker.h>
@@ -83,7 +83,16 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   // ofstream fout;
   // fout.open("/home/boboyu/Desktop/RAL_Time/frontier.txt");
   // fout.close();
-  }
+  vpts_sub = nh.subscribe("/objects/target_vpts", 10, &FastExplorationManager::targetViewpointsCallback, this);
+  custom_goal_pose_sub = nh.subscribe("/initialpose", 10, &FastExplorationManager::customPoseCallback, this);
+
+  // custom goal. just something to start with
+  custom_goal_pose.position.x = -1;
+  custom_goal_pose.position.y = -1;
+  custom_goal_pose.position.z = 1;
+  
+
+}
 
 int FastExplorationManager::planExploreMotion(
     const Vector3d& pos, const Vector3d& vel, const Vector3d& acc, const Vector3d& yaw) {
@@ -124,7 +133,38 @@ int FastExplorationManager::planExploreMotion(
   // Do global and local tour planning and retrieve the next viewpoint
   Vector3d next_pos;
   double next_yaw;
-  if (ed_->points_.size() > 1) {
+  // insert target viewpoints:
+  if (CUSTOM_GOAL){
+      next_pos(0) = custom_goal_pose.position.x;
+      next_pos(1) = custom_goal_pose.position.y;
+      next_pos(2) = 1;
+      geometry_msgs::Quaternion q = custom_goal_pose.orientation;
+      double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+      double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+      next_yaw = std::atan2(siny_cosp, cosy_cosp);    
+  }
+  else if (target_vpts.size() >= 1){
+    // greedy 
+    // find the closest viewpoint to current position
+    
+    double min_dist = 10000.0;
+    for (auto& vpt: target_vpts){
+      double dist = std::sqrt(pow(pos(0) - vpt.position.x, 2) + pow(pos(1) - vpt.position.y, 2) + pow(pos(2) - vpt.position.z, 2));
+      if (dist < min_dist){
+        next_pos(0) = vpt.position.x;
+        next_pos(1) = vpt.position.y;
+        next_pos(2) = vpt.position.z;
+        geometry_msgs::Quaternion q = vpt.orientation;
+        double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+        double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+        next_yaw = std::atan2(siny_cosp, cosy_cosp);
+        
+        min_dist = dist;
+      }
+    }
+    // TSP
+  }
+  else if (ed_->points_.size() > 1) {
     // Find the global tour passing through all viewpoints
     // Create TSP and solve by LKH
     // Optimal tour is returned as indices of frontier
@@ -237,6 +277,8 @@ int FastExplorationManager::planExploreMotion(
   }
   ed_->path_next_goal_ = planner_manager_->path_finder_->getPath();
   shortenPath(ed_->path_next_goal_);
+  for (auto& goal: ed_->path_next_goal_)
+    std::cout<<"path point: "<<goal.transpose()<<std::endl;
 
   const double radius_far = 3.0;
   const double radius_close = 1.0;
@@ -244,7 +286,9 @@ int FastExplorationManager::planExploreMotion(
   if (len < radius_close) {
     // Next viewpoint is very close, no need to search kinodynamic path, just use waypoints-based
     // optimization
-    planner_manager_->planExploreTraj(ed_->path_next_goal_, vel, acc, time_lb);
+    if (ed_->path_next_goal_.size()>1)
+      planner_manager_->planExploreTraj(ed_->path_next_goal_, vel, acc, time_lb); // update trajectory in place
+    
     ed_->next_goal_ = next_pos;
 
   } else if (len > radius_far) {  // Very rarely happens for our use case. The arena is very small
@@ -501,6 +545,15 @@ void FastExplorationManager::refineLocalTour(
 
   parse_time = (ros::Time::now() - t1).toSec();
   // ROS_WARN("create: %lf, search: %lf, parse: %lf", create_time, search_time, parse_time);
+}
+
+
+void FastExplorationManager::targetViewpointsCallback(const geometry_msgs::PoseArray& msg){
+  target_vpts = msg.poses;
+}
+
+void FastExplorationManager::customPoseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg){
+  custom_goal_pose = msg.pose.pose;
 }
 
 }  // namespace fast_planner
