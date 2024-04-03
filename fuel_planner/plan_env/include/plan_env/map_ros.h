@@ -50,7 +50,6 @@ private:
 
   // custom
   void attCallback(const sensor_msgs::ImageConstPtr& img);
-  void publishAtt();
   unique_ptr<cv::Mat> att_image_; // holds 2d attention map
   // ros::Subscriber att_sub_; // subscribes to 2d attention map
   ros::Publisher att_3d_pub_;  // publish 3d attention map
@@ -112,7 +111,7 @@ private:
   int proj_points_cnt;
   double fuse_time_, esdf_time_, max_fuse_time_, max_esdf_time_;
   int fuse_num_, esdf_num_;
-  pcl::PointCloud<pcl::PointXYZ> point_cloud_;
+  pcl::PointCloud<pcl::PointXYZI> point_cloud_;
 
   normal_distribution<double> rand_noise_;
   default_random_engine eng_;

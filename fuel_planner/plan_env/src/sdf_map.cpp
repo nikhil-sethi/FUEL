@@ -71,7 +71,7 @@ void SDFMap::setParams(ros::NodeHandle& nh, std::string ns){
   md_->tmp_buffer1_ = vector<double>(buffer_size, 0);
   md_->tmp_buffer2_ = vector<double>(buffer_size, 0);
 
-  md_->attention_buffer_ = vector<float>(buffer_size, 0);
+  // md_->attention_buffer_ = vector<float>(buffer_size, 0);
 
   md_->raycast_num_ = 0;
   md_->reset_updated_box_ = true;
@@ -272,7 +272,7 @@ void SDFMap::setCacheOccupancy(const int& adr, const int& occ) {
 }
 
 void SDFMap::inputPointCloud(
-    const pcl::PointCloud<pcl::PointXYZ>& points, const int& point_num,
+    const pcl::PointCloud<pcl::PointXYZI>& points, const int& point_num,
     const Eigen::Vector3d& camera_pos) {
   if (point_num == 0) return;
   md_->raycast_num_ += 1;
