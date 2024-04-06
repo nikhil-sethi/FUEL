@@ -390,55 +390,56 @@ void FastExplorationManager::findGlobalTour(
   frontier_finder_->getFullCostMatrix(cur_pos, cur_vel, cur_yaw, cost_mat);
   const int dimension = cost_mat.rows();
 
+  // insert the target points into the costs here
+
+
   double mat_time = (ros::Time::now() - t1).toSec();
   t1 = ros::Time::now();
 
+  // solve the TSP and read the tour as indices
+  solveTSPAndGetTour(cost_mat, indices, ep_->tsp_dir_);
+
+
+  // Get the path of optimal tour from path matrix
+  frontier_finder_->getPathForTour(cur_pos, indices, ed_->global_tour_);
+
+  double tsp_time = (ros::Time::now() - t1).toSec();
+  ROS_WARN("Cost mat: %lf, TSP: %lf", mat_time, tsp_time);
+}
+
+void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat, vector<int>& indices, const std::string& file_dir){
+   const int dimension = cost_mat.rows();
+
   // Write params and cost matrix to problem file
-  ofstream prob_file(ep_->tsp_dir_ + "/single.tsp");
+  ofstream prob_file(file_dir + "/single.tsp");
   // Problem specification part, follow the format of TSPLIB
 
   string prob_spec = "NAME : single\nTYPE : ATSP\nDIMENSION : " + to_string(dimension) +
       "\nEDGE_WEIGHT_TYPE : "
       "EXPLICIT\nEDGE_WEIGHT_FORMAT : FULL_MATRIX\nEDGE_WEIGHT_SECTION\n";
 
-  // string prob_spec = "NAME : single\nTYPE : TSP\nDIMENSION : " + to_string(dimension) +
-  //     "\nEDGE_WEIGHT_TYPE : "
-  //     "EXPLICIT\nEDGE_WEIGHT_FORMAT : LOWER_ROW\nEDGE_WEIGHT_SECTION\n";
-
   prob_file << prob_spec;
-  // prob_file << "TYPE : TSP\n";
-  // prob_file << "EDGE_WEIGHT_FORMAT : LOWER_ROW\n";
+
   // Problem data part
   const int scale = 100;
-  if (false) {
-    // Use symmetric TSP
-    for (int i = 1; i < dimension; ++i) {
-      for (int j = 0; j < i; ++j) {
-        int int_cost = cost_mat(i, j) * scale;
-        prob_file << int_cost << " ";
-      }
-      prob_file << "\n";
+  // Use Asymmetric TSP
+  for (int i = 0; i < dimension; ++i) {
+    for (int j = 0; j < dimension; ++j) {
+      int int_cost = cost_mat(i, j) * scale;
+      prob_file << int_cost << " ";
     }
-
-  } else {
-    // Use Asymmetric TSP
-    for (int i = 0; i < dimension; ++i) {
-      for (int j = 0; j < dimension; ++j) {
-        int int_cost = cost_mat(i, j) * scale;
-        prob_file << int_cost << " ";
-      }
-      prob_file << "\n";
-    }
+    prob_file << "\n";
   }
+  
 
   prob_file << "EOF";
   prob_file.close();
 
   // Call LKH TSP solver
-  solveTSPLKH((ep_->tsp_dir_ + "/single.par").c_str());
+  solveTSPLKH((file_dir + "/single.par").c_str());
 
   // Read optimal tour from the tour section of result file
-  ifstream res_file(ep_->tsp_dir_ + "/single.txt");
+  ifstream res_file(file_dir + "/single.txt");
   string res;
   while (getline(res_file, res)) {
     // Go to tour section
@@ -473,13 +474,8 @@ void FastExplorationManager::findGlobalTour(
   }
 
   res_file.close();
-
-  // Get the path of optimal tour from path matrix
-  frontier_finder_->getPathForTour(cur_pos, indices, ed_->global_tour_);
-
-  double tsp_time = (ros::Time::now() - t1).toSec();
-  ROS_WARN("Cost mat: %lf, TSP: %lf", mat_time, tsp_time);
 }
+
 
 void FastExplorationManager::refineLocalTour(
     const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d& cur_yaw,

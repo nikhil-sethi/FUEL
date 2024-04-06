@@ -64,6 +64,7 @@ private:
   void shortenPath(vector<Vector3d>& path);
   void targetViewpointsCallback(const geometry_msgs::PoseArray& msg);
   void customPoseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg);
+  void solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat, vector<int>& indices, const std::string& file_dir);
 
 public:
   typedef shared_ptr<FastExplorationManager> Ptr;
