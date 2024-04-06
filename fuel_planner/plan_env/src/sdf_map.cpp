@@ -71,7 +71,7 @@ void SDFMap::setParams(ros::NodeHandle& nh, std::string ns){
   md_->tmp_buffer1_ = vector<double>(buffer_size, 0);
   md_->tmp_buffer2_ = vector<double>(buffer_size, 0);
 
-  md_->attention_buffer_ = vector<float>(buffer_size, 0);
+  // md_->attention_buffer_ = vector<float>(buffer_size, 0);
 
   md_->raycast_num_ = 0;
   md_->reset_updated_box_ = true;
@@ -272,7 +272,7 @@ void SDFMap::setCacheOccupancy(const int& adr, const int& occ) {
 }
 
 void SDFMap::inputPointCloud(
-    const pcl::PointCloud<pcl::PointXYZ>& points, const int& point_num,
+    const pcl::PointCloud<pcl::PointXYZI>& points, const int& point_num,
     const Eigen::Vector3d& camera_pos) {
   if (point_num == 0) return;
   md_->raycast_num_ += 1;
@@ -300,13 +300,13 @@ void SDFMap::inputPointCloud(
       length = (pt_w - camera_pos).norm();
       if (length > mp_->max_ray_length_)
         pt_w = (pt_w - camera_pos) / length * mp_->max_ray_length_ + camera_pos;
-      if (pt_w[2] < 0.2) continue;
+      if (pt_w[2] < 0.1) continue;
       tmp_flag = 0;
     } else {
       length = (pt_w - camera_pos).norm();
       if (length > mp_->max_ray_length_) {
         pt_w = (pt_w - camera_pos) / length * mp_->max_ray_length_ + camera_pos;
-        if (pt_w[2] < 0.2) continue;
+        if (pt_w[2] < 0.1) continue;
         tmp_flag = 0;
       } else
         tmp_flag = 1;
