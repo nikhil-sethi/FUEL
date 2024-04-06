@@ -300,13 +300,13 @@ void SDFMap::inputPointCloud(
       length = (pt_w - camera_pos).norm();
       if (length > mp_->max_ray_length_)
         pt_w = (pt_w - camera_pos) / length * mp_->max_ray_length_ + camera_pos;
-      if (pt_w[2] < 0.2) continue;
+      if (pt_w[2] < 0.1) continue;
       tmp_flag = 0;
     } else {
       length = (pt_w - camera_pos).norm();
       if (length > mp_->max_ray_length_) {
         pt_w = (pt_w - camera_pos) / length * mp_->max_ray_length_ + camera_pos;
-        if (pt_w[2] < 0.2) continue;
+        if (pt_w[2] < 0.1) continue;
         tmp_flag = 0;
       } else
         tmp_flag = 1;
