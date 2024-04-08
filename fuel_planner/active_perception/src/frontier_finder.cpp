@@ -605,54 +605,27 @@ void FrontierFinder::getPathForTour(
 void FrontierFinder::getFullCostMatrix(
     const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
     Eigen::MatrixXd& mat) {
-  if (false) {
-    // Use symmetric TSP formulation
-    int dim = frontiers_.size() + 2;
-    mat.resize(dim, dim);  // current pose (0), sites, and virtual depot finally
 
-    int i = 1, j = 1;
-    for (auto ftr : frontiers_) {
-      for (auto cs : ftr.costs_)
-        mat(i, j++) = cs;
-      ++i;
-      j = 1;
-    }
-
-    // Costs from current pose to sites
-    for (auto ftr : frontiers_) {
-      Viewpoint vj = ftr.viewpoints_.front();
-      vector<Vector3d> path;
-      mat(0, j) = mat(j, 0) =
-          ViewNode::computeCost(cur_pos, vj.pos_, cur_yaw[0], vj.yaw_, cur_vel, cur_yaw[1], path);
-      ++j;
-    }
-    // Costs from depot to sites, the same large vaule
-    for (j = 1; j < dim - 1; ++j) {
-      mat(dim - 1, j) = mat(j, dim - 1) = 100;
-    }
-    // Zero cost to depot to ensure connection
-    mat(0, dim - 1) = mat(dim - 1, 0) = -10000;
-
-  } else {
-    // Use Asymmetric TSP
+  // Use Asymmetric TSP
     int dimen = frontiers_.size();
     mat.resize(dimen + 1, dimen + 1);
     // std::cout << "mat size: " << mat.rows() << ", " << mat.cols() << std::endl;
     // Fill block for clusters
     int i = 1, j = 1;
     for (auto ftr : frontiers_) {
+      j = 1;
+      // i++;
       for (auto cs : ftr.costs_) {
-        // std::cout << "(" << i << ", " << j << ")"
-        // << ", ";
         mat(i, j++) = cs;
       }
       ++i;
-      j = 1;
     }
-    // std::cout << "" << std::endl;
-
     // Fill block from current state to clusters
-    mat.leftCols<1>().setZero();
+    
+    mat.leftCols<1>().setZero(); // first column of matrix
+
+    // first row of mat
+    j = 1;
     for (auto ftr : frontiers_) {
       // std::cout << "(0, " << j << ")"
       // << ", ";
@@ -662,7 +635,7 @@ void FrontierFinder::getFullCostMatrix(
           ViewNode::computeCost(cur_pos, vj.pos_, cur_yaw[0], vj.yaw_, cur_vel, cur_yaw[1], path);
     }
     // std::cout << "" << std::endl;
-  }
+  
 }
 
 void FrontierFinder::findViewpoints(

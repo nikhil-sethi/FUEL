@@ -79,6 +79,14 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   par_file << "OUTPUT_TOUR_FILE =" << ep_->tsp_dir_ << "/single.txt\n";
   par_file << "RUNS = 1\n";
 
+  // Initialize TSP par file
+  std::string dir = "/root/thesis_ws/src/thesis/sw/bringup/resource";
+  ofstream par_file2(dir+"/single.par");
+  par_file2 << "PROBLEM_FILE = " << dir <<"/single.tsp\n";
+  par_file2 << "GAIN23 = NO\n";
+  par_file2 << "OUTPUT_TOUR_FILE =" << dir << "/single.txt\n";
+  par_file2 << "RUNS = 1\n";
+
   // Analysis
   // ofstream fout;
   // fout.open("/home/boboyu/Desktop/RAL_Time/frontier.txt");
@@ -123,25 +131,42 @@ int FastExplorationManager::planExploreMotion(
       next_yaw = std::atan2(siny_cosp, cosy_cosp);    
   }
   else if (!target_vpts.empty()){
+    int num_targets = target_vpts.size();
     // greedy 
     // find the closest viewpoint to current position
-    
-    double min_dist = 10000.0;
-    for (auto& vpt: target_vpts){
-      double dist = std::sqrt(pow(pos(0) - vpt.position.x, 2) + pow(pos(1) - vpt.position.y, 2) + pow(pos(2) - vpt.position.z, 2));
-      if (dist < min_dist){
-        next_pos(0) = vpt.position.x;
-        next_pos(1) = vpt.position.y;
-        next_pos(2) = vpt.position.z;
-        geometry_msgs::Quaternion q = vpt.orientation;
-        double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
-        double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-        next_yaw = std::atan2(siny_cosp, cosy_cosp);
-        
-        min_dist = dist;
+    if (num_targets==1){
+      double min_dist = 10000.0;
+      for (auto& vpt: target_vpts){
+        double dist = std::sqrt(pow(pos(0) - vpt.position.x, 2) + pow(pos(1) - vpt.position.y, 2) + pow(pos(2) - vpt.position.z, 2));
+        if (dist < min_dist){
+          next_pos(0) = vpt.position.x;
+          next_pos(1) = vpt.position.y;
+          next_pos(2) = vpt.position.z;
+          geometry_msgs::Quaternion q = vpt.orientation;
+          double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+          double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+          next_yaw = std::atan2(siny_cosp, cosy_cosp);
+          
+          min_dist = dist;
+        }
       }
     }
     // TSP
+    else if (num_targets>1){
+      vector<int> indices;
+      findTargetTour(pos, vel, yaw, indices);
+      // Choose the next viewpoint from global tour
+      auto vpt = target_vpts[indices[0]];
+      next_pos(0) = vpt.position.x;
+      next_pos(1) = vpt.position.y;
+      next_pos(2) = vpt.position.z;
+      geometry_msgs::Quaternion q = vpt.orientation;
+      double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+      double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+      next_yaw = std::atan2(siny_cosp, cosy_cosp);
+    
+    }
+
   }
   else{
     // Search frontiers and group them into clusters
@@ -391,7 +416,7 @@ void FastExplorationManager::findGlobalTour(
   const int dimension = cost_mat.rows();
 
   // insert the target points into the costs here
-
+  // addTargetstoCostMatrix(cost_mat);
 
   double mat_time = (ros::Time::now() - t1).toSec();
   t1 = ros::Time::now();
@@ -476,6 +501,109 @@ void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat,
   res_file.close();
 }
 
+// void addTargetstoCostMatrix(Eigen::MatrixXd cost_mat){
+//   const int dim = cost_mat.rows()
+//   Eigen::MatrixXd new_mat;
+  
+//   new_mat.resize(dim + target_vpts.size(), dim + target_vpts.size());
+//   new_mat.block(0,0,dim, dim).array() = cost_mat;
+
+//   for (int i=dim; i<dim + target_vpts.size(); )
+
+// }
+
+void FastExplorationManager::findTargetTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
+    vector<int>& indices){
+      Eigen::MatrixXd cost_mat;
+      int dim = target_vpts.size()+1;
+      cost_mat.resize(dim, dim);
+      cost_mat.setZero();
+      
+      Eigen::Vector3d pos_i, vel_i, pos_j, vel_j;
+      double yaw_i, yaw_j;
+      geometry_msgs::Pose pose_i, pose_j;
+      std::cout <<dim<<std::endl;
+      target_paths.resize(target_vpts.size());
+      for (auto& vec: target_paths){
+        vec.resize(0);
+      }
+      
+      // Costs between target viewpoints
+      for (int i=0; i<dim; i++){
+        for (int j=i+1; j<dim; j++){
+          pose_j = target_vpts[j-1];
+          pos_j = Eigen::Vector3d(pose_j.position.x, pose_j.position.y, pose_j.position.z);
+
+          geometry_msgs::Quaternion q = pose_j.orientation;
+          double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+          double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+          yaw_j = std::atan2(siny_cosp, cosy_cosp);
+          vector<Vector3d> path_ij;
+          std::cout << i<<", "<<j<<" | ";
+          if (i==0){ // jth target to current pose
+              // Assymetric TSP
+              cost_mat(i, j) = ViewNode::computeCost(cur_pos, pos_j, cur_yaw[0], yaw_j, cur_vel, cur_yaw[1], path_ij);
+          }
+          else{ // jth target to ith target
+            
+            pose_i = target_vpts[i-1];            
+            
+            geometry_msgs::Quaternion q = pose_i.orientation;
+            double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+            double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+
+            pos_i = Eigen::Vector3d(pose_i.position.x, pose_i.position.y, pose_i.position.z);
+            yaw_i = std::atan2(siny_cosp, cosy_cosp);
+            vel_i = Eigen::Vector3d(0, 0, 0);
+
+            cost_mat(i, j) = ViewNode::computeCost(pos_i, pos_j, yaw_i, yaw_j, vel_i, 0, path_ij);
+            cost_mat(j, i) = cost_mat(i, j);
+            std::cout<<pos_i.transpose()<< "| "<< pos_j.transpose() <<std::endl;
+            target_paths[i-1].push_back(path_ij);
+            reverse(path_ij.begin(), path_ij.end());
+            target_paths[j-1].push_back(path_ij);
+          }
+        }
+      }    
+
+      std::cout <<cost_mat<<std::endl;
+
+
+       // solve the TSP and read the tour as indices
+      solveTSPAndGetTour(cost_mat, indices, "/root/thesis_ws/src/thesis/sw/bringup/resource");
+
+
+      // Get the path of optimal tour from path matrix
+      getPathForTour(cur_pos, indices, ed_->global_tour_);
+
+}
+
+void FastExplorationManager::getPathForTour(const Vector3d& pos, const vector<int>& ids, vector<Vector3d>& path){
+    // Compute the path from current pos to the first frontier
+  vector<Vector3d> segment;
+  geometry_msgs::Pose pose = target_vpts[ids[0]];
+  Eigen::Vector3d vpt_pos = Eigen::Vector3d(pose.position.x, pose.position.y, pose.position.z);
+  ViewNode::searchPath(pos, vpt_pos, segment);
+  path.insert(path.end(), segment.begin(), segment.end());
+  ROS_WARN("path1 len: %d", path.size());
+  // Get paths of tour passing all clusters
+  for (int i = 0; i < ids.size() - 1; ++i) {
+    // Move to path to next cluster
+    // auto path_iter = target_paths[ids[i]].begin();
+    int next_idx = ids[i + 1];
+    vector<Vector3d> segment;
+    if (next_idx > ids[i]){
+      segment = target_paths[ids[i]][next_idx-1];
+    }
+    else{
+      segment =  target_paths[ids[i]][next_idx];
+    }
+
+    ROS_WARN("next idx: %d", next_idx);
+    path.insert(path.end(), segment.begin(), segment.end());
+  }
+  ROS_WARN("path2 len: %d", path.size());
+}
 
 void FastExplorationManager::refineLocalTour(
     const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d& cur_yaw,
