@@ -108,6 +108,7 @@ int FastExplorationManager::planExploreMotion(
   auto t2 = t1;
   ed_->views_.clear();
   ed_->global_tour_.clear();
+  int ts_type = TARGET_SEARCH::TSP;
 
   std::cout << "start pos: " << pos.transpose() << ", vel: " << vel.transpose()
             << ", acc: " << acc.transpose() << std::endl;
@@ -134,7 +135,7 @@ int FastExplorationManager::planExploreMotion(
     int num_targets = target_vpts.size();
     // greedy 
     // find the closest viewpoint to current position
-    if (num_targets==1){
+    if (num_targets == 1 || ts_type==TARGET_SEARCH::GREEDY){
       double min_dist = 10000.0;
       for (auto& vpt: target_vpts){
         double dist = std::sqrt(pow(pos(0) - vpt.position.x, 2) + pow(pos(1) - vpt.position.y, 2) + pow(pos(2) - vpt.position.z, 2));
@@ -539,7 +540,7 @@ void FastExplorationManager::findTargetTour(const Vector3d& cur_pos, const Vecto
           double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
           yaw_j = std::atan2(siny_cosp, cosy_cosp);
           vector<Vector3d> path_ij;
-          std::cout << i<<", "<<j<<" | ";
+          // std::cout << i<<", "<<j<<" | ";
           if (i==0){ // jth target to current pose
               // Assymetric TSP
               cost_mat(i, j) = ViewNode::computeCost(cur_pos, pos_j, cur_yaw[0], yaw_j, cur_vel, cur_yaw[1], path_ij);
@@ -558,7 +559,7 @@ void FastExplorationManager::findTargetTour(const Vector3d& cur_pos, const Vecto
 
             cost_mat(i, j) = ViewNode::computeCost(pos_i, pos_j, yaw_i, yaw_j, vel_i, 0, path_ij);
             cost_mat(j, i) = cost_mat(i, j);
-            std::cout<<pos_i.transpose()<< "| "<< pos_j.transpose() <<std::endl;
+            // std::cout<<pos_i.transpose()<< "| "<< pos_j.transpose() <<std::endl;
             target_paths[i-1].push_back(path_ij);
             reverse(path_ij.begin(), path_ij.end());
             target_paths[j-1].push_back(path_ij);
@@ -566,7 +567,7 @@ void FastExplorationManager::findTargetTour(const Vector3d& cur_pos, const Vecto
         }
       }    
 
-      std::cout <<cost_mat<<std::endl;
+      // std::cout <<cost_mat<<std::endl;
 
 
        // solve the TSP and read the tour as indices
@@ -598,11 +599,8 @@ void FastExplorationManager::getPathForTour(const Vector3d& pos, const vector<in
     else{
       segment =  target_paths[ids[i]][next_idx];
     }
-
-    ROS_WARN("next idx: %d", next_idx);
     path.insert(path.end(), segment.begin(), segment.end());
   }
-  ROS_WARN("path2 len: %d", path.size());
 }
 
 void FastExplorationManager::refineLocalTour(

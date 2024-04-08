@@ -23,6 +23,7 @@ struct ExplorationParam;
 struct ExplorationData;
 
 enum EXPL_RESULT { NO_FRONTIER, FAIL, SUCCEED };
+enum TARGET_SEARCH {GREEDY, TSP, TSP_REFINED};
 
 class FastExplorationManager {
 public:
