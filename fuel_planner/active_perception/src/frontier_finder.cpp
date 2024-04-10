@@ -613,11 +613,12 @@ void FrontierFinder::getFullCostMatrix(
     // Fill block for clusters
     int i = 1, j = 1;
     for (auto ftr : frontiers_) {
-      j = 1;
+      // j = 1;
       // i++;
       for (auto cs : ftr.costs_) {
         mat(i, j++) = cs;
       }
+      j = 1;
       ++i;
     }
     // Fill block from current state to clusters
@@ -625,7 +626,7 @@ void FrontierFinder::getFullCostMatrix(
     mat.leftCols<1>().setZero(); // first column of matrix
 
     // first row of mat
-    j = 1;
+    // j = 1;
     for (auto ftr : frontiers_) {
       // std::cout << "(0, " << j << ")"
       // << ", ";

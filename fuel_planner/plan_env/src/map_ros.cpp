@@ -76,19 +76,19 @@ void MapROS::init() {
       new message_filters::Subscriber<geometry_msgs::PoseStamped>(node_, "/map_ros/pose", 25));
 
   // att_sub_ = node_.subscribe("/iris_depth_camera/attention_map/2d", 10, &MapROS::attCallback, this);
-  att_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(node_, "/iris_depth_camera/attention_map/2d", 50));
+  att_sub_.reset(new message_filters::Subscriber<sensor_msgs::CompressedImage>(node_, "/attention_map/2d/compressed", 50));
   
   sync_image_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePose>(
       MapROS::SyncPolicyImagePose(100), *depth_sub_, *pose_sub_));
   
-  sync_image_pose_image.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePoseImage>(
-      MapROS::SyncPolicyImagePoseImage(100), *depth_sub_, *pose_sub_, *att_sub_));
+  sync_image_pose_compimage.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePoseCompressedImage>(
+      MapROS::SyncPolicyImagePoseCompressedImage(100), *depth_sub_, *pose_sub_, *att_sub_));
 
   // sync_image_pose_->registerCallback(boost::bind(&MapROS::depthPoseCallback, this, _1, _2));
   sync_cloud_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyCloudPose>(
       MapROS::SyncPolicyCloudPose(100), *cloud_sub_, *pose_sub_));
   sync_cloud_pose_->registerCallback(boost::bind(&MapROS::cloudPoseCallback, this, _1, _2));
-  sync_image_pose_image->registerCallback(boost::bind(&MapROS::depthPoseAttCallback, this, _1, _2, _3));
+  sync_image_pose_compimage->registerCallback(boost::bind(&MapROS::depthPoseAttCallback, this, _1, _2, _3));
   map_start_time_ = ros::Time::now();
 
   att_3d_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/attention_map/local", 10);
@@ -141,7 +141,7 @@ void MapROS::updateESDFCallback(const ros::TimerEvent& /*event*/) {
 
 void MapROS::depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
                                const geometry_msgs::PoseStampedConstPtr& pose,
-                               const sensor_msgs::ImageConstPtr& att) {
+                               const sensor_msgs::CompressedImageConstPtr& att) {
   camera_pos_(0) = pose->pose.position.x;
   camera_pos_(1) = pose->pose.position.y;
   camera_pos_(2) = pose->pose.position.z;
@@ -157,8 +157,10 @@ void MapROS::depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
 
   auto t1 = ros::Time::now();
 
-  cv_bridge::CvImagePtr cv_ptr_att = cv_bridge::toCvCopy(att, att->encoding);
+  cv_bridge::CvImagePtr cv_ptr_att = cv_bridge::toCvCopy(att);
   cv_ptr_att->image.copyTo(*att_image_);
+
+  // att_image = cv::imdecode(cv::Mat(att->data),1)
 
 
   // generate point cloud, update map

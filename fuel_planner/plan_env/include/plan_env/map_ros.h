@@ -12,7 +12,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
-
+#include <sensor_msgs/CompressedImage.h>
 #include <memory>
 #include <random>
 
@@ -33,7 +33,7 @@ public:
 private:
   void depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
                          const geometry_msgs::PoseStampedConstPtr& pose,
-                         const sensor_msgs::ImageConstPtr& att);
+                         const sensor_msgs::CompressedImageConstPtr& att);
   void cloudPoseCallback(const sensor_msgs::PointCloud2ConstPtr& msg,
                          const geometry_msgs::PoseStampedConstPtr& pose);
   void updateESDFCallback(const ros::TimerEvent& /*event*/);
@@ -64,11 +64,11 @@ private:
   // may use ExactTime?
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped>
       SyncPolicyImagePose;
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped, sensor_msgs::Image>
-      SyncPolicyImagePoseImage;
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped, sensor_msgs::CompressedImage>
+      SyncPolicyImagePoseCompressedImage;
       
   typedef shared_ptr<message_filters::Synchronizer<SyncPolicyImagePose>> SynchronizerImagePose;
-  typedef shared_ptr<message_filters::Synchronizer<SyncPolicyImagePoseImage>> SynchronizerImagePoseImage;
+  typedef shared_ptr<message_filters::Synchronizer<SyncPolicyImagePoseCompressedImage>> SynchronizerImagePoseCompressedImage;
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2,
                                                           geometry_msgs::PoseStamped>
       SyncPolicyCloudPose;
@@ -78,9 +78,9 @@ private:
   shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depth_sub_;
   shared_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> cloud_sub_;
   shared_ptr<message_filters::Subscriber<geometry_msgs::PoseStamped>> pose_sub_;
-  shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> att_sub_;
+  shared_ptr<message_filters::Subscriber<sensor_msgs::CompressedImage>> att_sub_;
   SynchronizerImagePose sync_image_pose_;
-  SynchronizerImagePoseImage sync_image_pose_image;  
+  SynchronizerImagePoseCompressedImage sync_image_pose_compimage;  
   SynchronizerCloudPose sync_cloud_pose_;
 
   ros::Publisher map_local_pub_, map_local_inflate_pub_, esdf_pub_, map_all_pub_, unknown_pub_,
