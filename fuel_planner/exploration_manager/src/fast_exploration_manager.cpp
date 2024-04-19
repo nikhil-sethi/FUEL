@@ -317,7 +317,7 @@ int FastExplorationManager::planExploreMotion(
     std::cout<<"path point: "<<goal.transpose()<<std::endl;
 
   const double radius_far = 3.0;
-  const double radius_close = 1.0;
+  const double radius_close = 1.5;
   const double len = Astar::pathLength(ed_->path_next_goal_);
   if (len < radius_close) {
     // Next viewpoint is very close, no need to search kinodynamic path, just use waypoints-based
