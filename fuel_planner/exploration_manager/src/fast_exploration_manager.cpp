@@ -113,12 +113,25 @@ int FastExplorationManager::planExploreMotion(
   std::cout << "start pos: " << pos.transpose() << ", vel: " << vel.transpose()
             << ", acc: " << acc.transpose() << std::endl;
 
-  
-  // else if (target_vpts.empty()){
-  //   ROS_WARN("No coverable target.");
-  //   // return NO_TARGET;
-  // }
-    // Do global and local tour planning and retrieve the next viewpoint
+  // ===== FIND FRONTIERS =======
+  // Search frontiers and group them into clusters
+  frontier_finder_->searchFrontiers();
+
+  double frontier_time = (ros::Time::now() - t1).toSec();
+  t1 = ros::Time::now();
+
+  // Find viewpoints (x,y,z,yaw) for all frontier clusters and get visible ones' info
+  frontier_finder_->computeFrontiersToVisit();
+  frontier_finder_->getFrontiers(ed_->frontiers_);
+  frontier_finder_->getFrontierBoxes(ed_->frontier_boxes_);
+  frontier_finder_->getDormantFrontiers(ed_->dead_frontiers_);
+    
+  if (!ed_->frontiers_.empty())
+    frontier_finder_->updateFrontierCostMatrix();
+    
+  // ===== FIND NEXT VIEWPOINT and GLOBAL PATH ========
+
+  // Do global and local tour planning and retrieve the next viewpoint
   Vector3d next_pos;
   double next_yaw;
   // insert target viewpoints:
@@ -133,7 +146,7 @@ int FastExplorationManager::planExploreMotion(
   }
   else if (!target_vpts.empty()){
     int num_targets = target_vpts.size();
-    // greedy 
+    // greedy TODO change this to viewpoint cost to account for yaw as well
     // find the closest viewpoint to current position
     if (num_targets == 1 || ts_type==TARGET_SEARCH::GREEDY){
       double min_dist = 10000.0;
@@ -152,10 +165,26 @@ int FastExplorationManager::planExploreMotion(
         }
       }
     }
+
     // TSP
     else if (num_targets>1){
+      
+      // computeExploreTargets();
+
+      Eigen::MatrixXd cost_mat;
+      getTargetCostMatrix(pos, vel, yaw, cost_mat);
+      
+
       vector<int> indices;
-      findTargetTour(pos, vel, yaw, indices);
+      // findTargetTour(cost_mat, indices);
+      
+      // solve the TSP and read the tour as indices
+      solveTSPAndGetTour(cost_mat, indices, "/root/thesis_ws/src/thesis/sw/bringup/resource");
+
+
+      // Get the path of optimal tour from path matrix
+      getPathForTour(pos, indices, ed_->global_tour_);
+
       // Choose the next viewpoint from global tour
       auto vpt = target_vpts[indices[0]];
       next_pos(0) = vpt.position.x;
@@ -169,34 +198,20 @@ int FastExplorationManager::planExploreMotion(
     }
 
   }
-  else{
-    // Search frontiers and group them into clusters
-    frontier_finder_->searchFrontiers();
-
-    double frontier_time = (ros::Time::now() - t1).toSec();
-    t1 = ros::Time::now();
-
-    // Find viewpoints (x,y,z,yaw) for all frontier clusters and get visible ones' info
-    frontier_finder_->computeFrontiersToVisit();
-    frontier_finder_->getFrontiers(ed_->frontiers_);
-    frontier_finder_->getFrontierBoxes(ed_->frontier_boxes_);
-    frontier_finder_->getDormantFrontiers(ed_->dead_frontiers_);
-
+  else{ // pure exploration
     if (ed_->frontiers_.empty()) {
       ROS_WARN("No coverable frontier.");
       return NO_FRONTIER;
     }
-    
+
     frontier_finder_->getTopViewpointsInfo(pos, ed_->points_, ed_->yaws_, ed_->averages_);
     for (int i = 0; i < ed_->points_.size(); ++i)
-      ed_->views_.push_back(
-          ed_->points_[i] + 2.0 * Vector3d(cos(ed_->yaws_[i]), sin(ed_->yaws_[i]), 0));
+      ed_->views_.push_back(ed_->points_[i] + 2.0 * Vector3d(cos(ed_->yaws_[i]), sin(ed_->yaws_[i]), 0));
 
     double view_time = (ros::Time::now() - t1).toSec();
-    ROS_WARN(
-        "Frontier: %d, t: %lf, viewpoint: %d, t: %lf", ed_->frontiers_.size(), frontier_time,
-        ed_->points_.size(), view_time);
+    ROS_WARN("Frontier: %d, t: %lf, viewpoint: %d, t: %lf", ed_->frontiers_.size(), frontier_time, ed_->points_.size(), view_time);
 
+    // Global plan using TSP
     if (ed_->points_.size() > 1) {
       // Find the global tour passing through all viewpoints
       // Create TSP and solve by LKH
@@ -295,11 +310,32 @@ int FastExplorationManager::planExploreMotion(
 
   }
 
-
   std::cout << "Next view: " << next_pos.transpose() << ", " << next_yaw << std::endl;
+
+
+  // ===== FIND LOCAL PATH TO NEXT VIEWPOINT
 
   // Plan trajectory (position and yaw) to the next viewpoint
   t1 = ros::Time::now();
+
+  // search coarse kino Astar path and plan a bspline through points
+  if (getTrajToView(pos, vel, acc, yaw, next_pos, next_yaw) == FAIL)
+    return FAIL;
+
+  double traj_plan_time = (ros::Time::now() - t1).toSec();
+  t1 = ros::Time::now();
+
+  double yaw_time = (ros::Time::now() - t1).toSec();
+  ROS_WARN("Traj: %lf, yaw: %lf", traj_plan_time, yaw_time);
+  double total = (ros::Time::now() - t2).toSec();
+  ROS_WARN("Total time: %lf", total);
+  ROS_ERROR_COND(total > 0.1, "Total time too long!!!");
+
+  return SUCCEED;
+}
+
+
+int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eigen::Vector3d& vel, const Eigen::Vector3d& acc, const Eigen::Vector3d& yaw, Eigen::Vector3d& next_pos, double next_yaw){
 
   // Compute time lower bound of yaw and use in trajectory generation
   double diff = fabs(next_yaw - yaw[0]);
@@ -317,7 +353,7 @@ int FastExplorationManager::planExploreMotion(
     std::cout<<"path point: "<<goal.transpose()<<std::endl;
 
   const double radius_far = 3.0;
-  const double radius_close = 1.5;
+  const double radius_close = 1.5;  // don't change this below 1.5 or you'll observe a alot of kinodynamic search failures
   const double len = Astar::pathLength(ed_->path_next_goal_);
   if (len < radius_close) {
     // Next viewpoint is very close, no need to search kinodynamic path, just use waypoints-based
@@ -361,15 +397,6 @@ int FastExplorationManager::planExploreMotion(
 
   planner_manager_->planYawExplore(yaw, next_yaw, true, ep_->relax_time_);
 
-  double traj_plan_time = (ros::Time::now() - t1).toSec();
-  t1 = ros::Time::now();
-
-  double yaw_time = (ros::Time::now() - t1).toSec();
-  ROS_WARN("Traj: %lf, yaw: %lf", traj_plan_time, yaw_time);
-  double total = (ros::Time::now() - t2).toSec();
-  ROS_WARN("Total time: %lf", total);
-  ROS_ERROR_COND(total > 0.1, "Total time too long!!!");
-
   return SUCCEED;
 }
 
@@ -412,7 +439,7 @@ void FastExplorationManager::findGlobalTour(
 
   // Get cost matrix for current state and clusters
   Eigen::MatrixXd cost_mat;
-  frontier_finder_->updateFrontierCostMatrix();
+  // frontier_finder_->updateFrontierCostMatrix();
   frontier_finder_->getFullCostMatrix(cur_pos, cur_vel, cur_yaw, cost_mat);
   const int dimension = cost_mat.rows();
 
@@ -513,9 +540,9 @@ void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat,
 
 // }
 
-void FastExplorationManager::findTargetTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
-    vector<int>& indices){
-      Eigen::MatrixXd cost_mat;
+
+void FastExplorationManager::getTargetCostMatrix(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, Eigen::MatrixXd& cost_mat){
+      // Eigen::MatrixXd cost_mat;
       int dim = target_vpts.size()+1;
       cost_mat.resize(dim, dim);
       cost_mat.setZero();
@@ -566,40 +593,44 @@ void FastExplorationManager::findTargetTour(const Vector3d& cur_pos, const Vecto
           }
         }
       }    
-
-      // std::cout <<cost_mat<<std::endl;
-
-
-       // solve the TSP and read the tour as indices
-      solveTSPAndGetTour(cost_mat, indices, "/root/thesis_ws/src/thesis/sw/bringup/resource");
-
-
-      // Get the path of optimal tour from path matrix
-      getPathForTour(cur_pos, indices, ed_->global_tour_);
-
 }
 
-void FastExplorationManager::getPathForTour(const Vector3d& pos, const vector<int>& ids, vector<Vector3d>& path){
-    // Compute the path from current pos to the first frontier
+
+
+// void FastExplorationManager::findTargetTour(Eigen::Matrix& cost_mat, vector<int>& indices){
+
+//        // solve the TSP and read the tour as indices
+//       solveTSPAndGetTour(cost_mat, indices, "/root/thesis_ws/src/thesis/sw/bringup/resource");
+
+
+//       // Get the path of optimal tour from path matrix
+//       getPathForTour(cur_pos, indices, ed_->global_tour_);
+
+// }
+
+void FastExplorationManager::getPathForTour(const Vector3d& pos, const vector<int>& ids, vector<Vector3d>& expanded_path){
+  
+  
+  // Compute the path from current pos to the first frontier
   vector<Vector3d> segment;
   geometry_msgs::Pose pose = target_vpts[ids[0]];
   Eigen::Vector3d vpt_pos = Eigen::Vector3d(pose.position.x, pose.position.y, pose.position.z);
   ViewNode::searchPath(pos, vpt_pos, segment);
-  path.insert(path.end(), segment.begin(), segment.end());
-  ROS_WARN("path1 len: %d", path.size());
+  expanded_path.insert(expanded_path.end(), segment.begin(), segment.end());
+  // ROS_WARN("path1 len: %d", expanded_path.size());
   // Get paths of tour passing all clusters
   for (int i = 0; i < ids.size() - 1; ++i) {
     // Move to path to next cluster
     // auto path_iter = target_paths[ids[i]].begin();
     int next_idx = ids[i + 1];
     vector<Vector3d> segment;
-    if (next_idx > ids[i]){
+    if (next_idx > ids[i]){ // because paths to self are never saved. So matrix is 1 less than actual size. this just compensates for that
       segment = target_paths[ids[i]][next_idx-1];
     }
     else{
       segment =  target_paths[ids[i]][next_idx];
     }
-    path.insert(path.end(), segment.begin(), segment.end());
+    expanded_path.insert(expanded_path.end(), segment.begin(), segment.end());
   }
 }
 

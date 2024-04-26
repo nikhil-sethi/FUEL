@@ -224,7 +224,7 @@ void MapROS::proessDepthImage() {
       depth = (*row_ptr) * inv_factor;
       row_ptr = row_ptr + skip_pixel_;
         // if (attention_needs_update_){
-      attention = att_row_ptr[u]/(2*255.0f);
+      attention = 2*att_row_ptr[u]/(255.0f);
       //  }
       // // filter depth
       // if (depth > 0.01)
@@ -455,12 +455,12 @@ void MapROS::publishDepth() {
     pt.y = point_cloud_.points[i].y;
     pt.z = point_cloud_.points[i].z;
     cloud.push_back(pt);
-    if (point_cloud_.points[i].intensity >0.001){ // only valid semantic points
+    if (point_cloud_.points[i].intensity >1){ // only valid semantic points
       att_cloud.push_back(point_cloud_.points[i]);
     }
   }
   cloud.width = cloud.points.size();
-  cloud.height = 1;
+  cloud.height = 1; 
   cloud.is_dense = true;
   cloud.header.frame_id = frame_id_;
   sensor_msgs::PointCloud2 cloud_msg;
