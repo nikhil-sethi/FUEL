@@ -7,6 +7,7 @@
 #include <exploration_manager/expl_data.h>
 #include <plan_env/edt_environment.h>
 #include <plan_env/sdf_map.h>
+#include <std_srvs/Trigger.h>
 
 using Eigen::Vector4d;
 
@@ -29,7 +30,7 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   planner_manager_ = expl_manager_->planner_manager_;
   state_ = EXPL_STATE::INIT;
   fd_->have_odom_ = false;
-  fd_->state_str_ = { "INIT", "WAIT_TRIGGER", "PLAN_TRAJ", "PUB_TRAJ", "EXEC_TRAJ", "FINISH" };
+  fd_->state_str_ = { "INIT", "WAIT_TRIGGER", "PLAN_TRAJ", "PUB_TRAJ", "EXEC_TRAJ", "FINISH" , "IDLE"};
   fd_->static_state_ = true;
   fd_->trigger_ = false;
 
@@ -45,6 +46,11 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   replan_pub_ = nh.advertise<std_msgs::Empty>("/planning/replan", 10);
   new_pub_ = nh.advertise<std_msgs::Empty>("/planning/new", 10);
   bspline_pub_ = nh.advertise<bspline::Bspline>("/planning/bspline", 10);
+
+  metrics_client_ = nh.serviceClient<std_srvs::Trigger>("/planning/metrics");
+  px4ci_finish_client = nh.serviceClient<std_srvs::Trigger>("/px4_mission_finished_ext_cont");
+  disable_interface_client_ = nh.serviceClient<std_srvs::Trigger>("/px4_ext_cont_disable");
+
 }
 
 void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
@@ -70,6 +76,40 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
 
     case FINISH: {
       ROS_INFO_THROTTLE(1.0, "finish exploration.");
+
+      // calculate metrics for attention map
+      std_srvs::Trigger srv1;
+      // Send the request to trigger the service
+      bool res1 = metrics_client_.call(srv1);
+      if (res1) {
+          ROS_INFO("Metrics service triggered successfully");
+          // Handle the response if needed
+      } else {
+          ROS_ERROR("Failed to call metrics service");
+      }
+
+      // disable interface control loop
+      std_srvs::Trigger srv2;
+      bool res2 = px4ci_finish_client.call(srv2);
+      if (res2) {
+          ROS_INFO("Mission finish service triggered successfully");
+          // Handle the response if needed
+      } else {
+          ROS_ERROR("Failed to call px4ci_finish service");
+      }
+
+      // end mission, go to home
+      std_srvs::Trigger srv3;
+      bool res3 = disable_interface_client_.call(srv3);
+      if (res3) {
+          ROS_INFO("Disable control interface successful");
+          // Handle the response if needed
+      } else {
+          ROS_ERROR("Failed to call disable_interfac service");
+      }
+      expl_manager_->getSDFMapPtr()->closeFile();
+
+      transitState(WAIT_TRIGGER, "FSM");
       break;
     }
 

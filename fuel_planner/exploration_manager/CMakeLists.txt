@@ -23,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
   lkh_tsp_solver
   plan_manage
   cv_bridge
+  std_srvs
 )
 
 catkin_package(
