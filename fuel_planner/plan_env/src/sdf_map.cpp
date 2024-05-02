@@ -86,7 +86,35 @@ void SDFMap::setParams(ros::NodeHandle& nh, std::string ns){
   posToIndex(mp_->box_mind_, mp_->box_min_);
   posToIndex(mp_->box_maxd_, mp_->box_max_);
 
+  attention_buffer_gt = std::vector<float>(buffer_size, 1);
+
 }
+
+void SDFMap::loadGTAttMap(){
+    pcl::PointCloud<pcl::PointXYZI> cloud;
+
+    // Load PCD file
+    if (pcl::io::loadPCDFile<pcl::PointXYZI>("/root/thesis_ws/src/thesis/sw/perception/attention_map/assets/attention_map_diffused_gt.pcd", cloud) == -1)
+    {
+        ROS_ERROR("Couldn't read file cloud.pcd");
+        return;
+    }
+    ROS_INFO("Loaded attention map succesfully");
+
+    // update the buffer
+    Eigen::Vector3d pos;
+    Eigen::Vector3i idx;
+    for (auto& pt: cloud.points){
+      pos[0] = pt.x;
+      pos[1] = pt.y;
+      pos[2] = pt.z;
+      posToIndex(pos, idx);
+      int adr = toAddress(idx);
+      attention_buffer_gt[adr] = pt.intensity;
+    }
+
+}
+
 
 void SDFMap::initMap(ros::NodeHandle& nh) {
   // mp_.reset(new MapParam);
@@ -105,6 +133,10 @@ void SDFMap::initMap(ros::NodeHandle& nh) {
     md_->all_min_[i] = 1000000;
     md_->all_max_[i] = -1000000;
   }
+
+  loadGTAttMap();
+
+
 }
 
 void SDFMap::resetBuffer() {
@@ -270,6 +302,8 @@ void SDFMap::setCacheOccupancy(const int& adr, const int& occ) {
   // if (md_->count_hit_and_miss_[adr] == 1)
   //   md_->cache_voxel_.push(adr);
 }
+
+void SDFMap::closeFile(){mr_->entropy_file.close();}
 
 void SDFMap::inputPointCloud(
     const pcl::PointCloud<pcl::PointXYZI>& points, const int& point_num,

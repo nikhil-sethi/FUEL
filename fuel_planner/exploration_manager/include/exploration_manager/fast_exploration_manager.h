@@ -45,6 +45,8 @@ public:
   shared_ptr<FrontierFinder> frontier_finder_;
   // unique_ptr<ViewFinder> view_finder_;
 
+  shared_ptr<SDFMap> getSDFMapPtr(){return sdf_map_;}
+
 private:
   shared_ptr<EDTEnvironment> edt_environment_;
   shared_ptr<SDFMap> sdf_map_;

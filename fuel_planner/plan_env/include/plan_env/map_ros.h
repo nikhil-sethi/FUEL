@@ -36,6 +36,9 @@ private:
                          const sensor_msgs::CompressedImageConstPtr& att);
   void cloudPoseCallback(const sensor_msgs::PointCloud2ConstPtr& msg,
                          const geometry_msgs::PoseStampedConstPtr& pose);
+  
+  void metricsTimer(const ros::TimerEvent& /*event*/);
+
   void updateESDFCallback(const ros::TimerEvent& /*event*/);
   void visCallback(const ros::TimerEvent& /*event*/);
 
@@ -56,9 +59,10 @@ private:
   bool attention_needs_update_ = false;
   ros::Publisher occ_pub_;  // publish occupancy buffer
   ros::Publisher occ_inflate_pub_;  // publish inflated occupancy buffer
-  ros::Timer occ_timer_;
+  ros::Timer occ_timer_, metrics_timer;
   vector<uint8_t> occupancy_buffer_light;
   void occupancyTimer(const ros::TimerEvent& e); // publishing occupancy buffer
+  std::fstream entropy_file;
 
   SDFMap* map_;
   // may use ExactTime?

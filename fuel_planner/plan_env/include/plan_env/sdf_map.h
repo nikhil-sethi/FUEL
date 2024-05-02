@@ -70,7 +70,8 @@ public:
   int getVoxelNum();
   void processAttentionMap();
   void setParams(ros::NodeHandle& nh, std::string ns="");
-
+  void loadGTAttMap();
+  void closeFile();
   int buffer_size;
 
 private:
@@ -88,6 +89,8 @@ private:
 
   friend MapROS;
   friend class ::AttentionMap; // in global namespace
+  std::vector<float> attention_buffer_gt;
+
 
 public:
   typedef std::shared_ptr<SDFMap> Ptr;

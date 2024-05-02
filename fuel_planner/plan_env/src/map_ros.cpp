@@ -5,6 +5,7 @@
 #include <pcl/point_types.h>
 #include <visualization_msgs/Marker.h>
 #include <common_msgs/uint8List.h>
+#include <ctime>
 
 #include <fstream>
 
@@ -101,6 +102,18 @@ void MapROS::init() {
   
   occupancy_buffer_light = vector<uint8_t>(map_->md_->occupancy_buffer_.size(), 0); 
   occ_timer_ = node_.createTimer(ros::Duration(0.05), &MapROS::occupancyTimer, this);
+  
+  // metrics
+  metrics_timer = node_.createTimer(ros::Duration(1), &MapROS::metricsTimer, this);
+
+  // current date/time based on current system
+  time_t now = time(0);
+   
+  // convert now to string form
+  std::string dt = ctime(&now);
+  std::string filename = "/root/entropy_" + dt + ".csv";
+  entropy_file.open(filename,  std::fstream::in | std::fstream::out | std::fstream::app);
+  entropy_file<<"time,entropy \n";
 }
 
 void MapROS::visCallback(const ros::TimerEvent& e) {
@@ -601,6 +614,20 @@ void MapROS::attCallback(const sensor_msgs::ImageConstPtr& img) {
   attention_needs_update_ = true;
 }
 
+
+void MapROS::metricsTimer(const ros::TimerEvent& event){
+  // calculate weighted map entropy
+  float entropy=0;
+  for (int i=0; i<map_->buffer_size; i++){
+    float prob = (map_->getOccupancy(i)==SDFMap::UNKNOWN? 0.5:1);
+    float weight = map_->attention_buffer_gt[i];
+    entropy += weight*prob*(-log2(prob));
+    // std::cout<<i <<" ";
+  }
+  entropy_file<< ros::Time::now() <<","<< entropy<<"\n";
+  // ROS_ERROR("Entropy: %f", entropy);
+
+}
 
 
 }
