@@ -23,6 +23,8 @@ find_package(catkin REQUIRED COMPONENTS
   traj_utils
   active_perception
   cv_bridge
+  tf
+  geometry_msgs
 )
 
 

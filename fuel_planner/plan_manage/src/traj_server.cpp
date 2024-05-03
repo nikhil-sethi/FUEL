@@ -7,6 +7,8 @@
 #include <ros/ros.h>
 #include <poly_traj/polynomial_traj.h>
 #include <active_perception/perception_utils.h>
+#include <tf/transform_datatypes.h>
+#include <geometry_msgs/PoseStamped.h>
 
 #include <plan_manage/backward.hpp>
 namespace backward {
@@ -455,6 +457,8 @@ int main(int argc, char** argv) {
   nh.param("fsm/replan_time", replan_time_, 0.1);
   nh.param("loop_correction/isLoopCorrection", isLoopCorrection, false);
 
+  geometry_msgs::PoseStamped init_pose  = *(ros::topic::waitForMessage<geometry_msgs::PoseStamped>("/mavros/vision_pose/pose", nh));
+
   Eigen::Vector3d init_pos;
   nh.param("traj_server/init_x", init_pos[0], 0.0);
   nh.param("traj_server/init_y", init_pos[1], 0.0);
@@ -470,12 +474,14 @@ int main(int argc, char** argv) {
   std::cout << start_time.toSec() << std::endl;
   std::cout << end_time.toSec() << std::endl;
 
+  tf::Quaternion quat(init_pose.pose.orientation.x, init_pose.pose.orientation.y, init_pose.pose.orientation.z, init_pose.pose.orientation.w);
+
   cmd.header.stamp = ros::Time::now();
   cmd.header.frame_id = "world";
   cmd.trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
   cmd.trajectory_id = traj_id_;
-  cmd.position.x = init_pos[0];
-  cmd.position.y = init_pos[1];
+  cmd.position.x = init_pose.pose.position.x;
+  cmd.position.y = init_pose.pose.position.y;
   cmd.position.z = init_pos[2];
   cmd.velocity.x = 0.0;
   cmd.velocity.y = 0.0;
@@ -483,7 +489,12 @@ int main(int argc, char** argv) {
   cmd.acceleration.x = 0.0;
   cmd.acceleration.y = 0.0;
   cmd.acceleration.z = 0.0;
-  cmd.yaw = 0.0;
+
+  double yaw, pitch, roll;
+
+  tf::Matrix3x3 mat(quat);
+  mat.getRPY(roll, pitch, yaw);
+  cmd.yaw = yaw;
   cmd.yaw_dot = 0.0;
 
   percep_utils_.reset(new PerceptionUtils(nh));
