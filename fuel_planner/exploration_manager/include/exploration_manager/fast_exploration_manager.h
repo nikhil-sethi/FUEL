@@ -8,6 +8,7 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <mutex>
 
 using Eigen::Vector3d;
 using std::shared_ptr;
@@ -68,14 +69,16 @@ private:
   void shortenPath(vector<Vector3d>& path);
   void targetViewpointsCallback(const geometry_msgs::PoseArray& msg);
   void customPoseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg);
-  void solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat, vector<int>& indices, const std::string& file_dir);
+  void solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat, const std::string& file_dir);
   // void findTargetTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, vector<int>& indices);
   void getPathForTour(const Vector3d& pos, const vector<int>& ids, vector<Vector3d>& path);
   int getTrajToView(const Eigen::Vector3d& pos,  const Eigen::Vector3d& vel, const Eigen::Vector3d& acc, const Eigen::Vector3d& yaw, Eigen::Vector3d& next_pos, double next_yaw);
   void getTargetCostMatrix(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, Eigen::MatrixXd& cost_mat);
+  void readTourFromFile(vector<int>& indices, const std::string& file_dir);
 
 public:
   typedef shared_ptr<FastExplorationManager> Ptr;
+  bool init = true;
 };
 
 }  // namespace fast_planner
