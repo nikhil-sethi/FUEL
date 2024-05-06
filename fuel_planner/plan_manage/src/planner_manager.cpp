@@ -144,7 +144,7 @@ bool FastPlannerManager::kinodynamicReplan(const Eigen::Vector3d& start_pt,
   auto t1 = ros::Time::now();
 
   kino_path_finder_->reset();
-  int status = kino_path_finder_->search(start_pt, start_vel, start_acc, end_pt, end_vel, false);
+  int status = kino_path_finder_->search(start_pt, start_vel, start_acc, end_pt, end_vel, true);
   if (status == KinodynamicAstar::NO_PATH) {
     ROS_ERROR("search 1 fail");
     // Retry
