@@ -259,7 +259,7 @@ void MapROS::proessDepthImage() {
       pt_cur(1) = (v - cy_) * depth / fy_;
       pt_cur(2) = depth;
       pt_world = camera_r * pt_cur + camera_pos_;
-      if (pt_world(2)<0.1)
+      if (pt_world(2)<0.0)
         attention = 0;
       auto& pt = point_cloud_.points[proj_points_cnt++];
       pt.x = pt_world[0];
