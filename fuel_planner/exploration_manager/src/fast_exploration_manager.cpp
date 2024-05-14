@@ -21,6 +21,44 @@
 
 using namespace Eigen;
 
+void solvePrioTSP(const std::string& file_dir, const Eigen::MatrixXd& cost_mat, const std::vector<float>& priorities){
+  const int dimension = cost_mat.rows();
+
+  // Write params and cost matrix to problem file
+  ofstream prob_file(file_dir + "/single.tsp");
+  // Problem specification part, follow the format of TSPLIB
+
+  string prob_spec = "NAME : single\nTYPE : ATSP\nDIMENSION : " + to_string(dimension) +
+      "\nEDGE_WEIGHT_TYPE : "
+      "EXPLICIT\nEDGE_WEIGHT_FORMAT : FULL_MATRIX\nEDGE_WEIGHT_SECTION\n";
+
+  prob_file << prob_spec;
+
+  // Problem data part
+  const int scale = 100;
+  // Use Asymmetric TSP
+  for (int i = 0; i < dimension; ++i) {
+    for (int j = 0; j < dimension; ++j) {
+      int int_cost = cost_mat(i, j) * scale;
+      prob_file << int_cost << " ";
+    }
+    prob_file << "\n";
+  }
+  
+
+  prob_file << "EOF";
+  prob_file.close();
+
+
+  std::string py_file_str ="python3 /root/thesis_ws/src/thesis/sw/planning/solve_prio_atsp.py ";
+  
+  // add arguments
+  for (float p: priorities)
+    py_file_str += (std::to_string(p)+" ");   
+  ROS_ERROR_STREAM(py_file_str);
+  system(py_file_str.c_str());
+}
+
 namespace fast_planner {
 // SECTION interfaces for setup and query
 
@@ -181,9 +219,9 @@ int FastExplorationManager::planExploreMotion(
       // findTargetTour(cost_mat, indices);
       
       // solve the TSP and read the tour as indices
-      solveTSPAndGetTour(cost_mat, indices, "/root/thesis_ws/src/thesis/sw/bringup/resource");
-
-
+      solveTSPAndGetTour(cost_mat, "/root/thesis_ws/src/thesis/sw/bringup/resource");
+      readTourFromFile(indices, ep_->tsp_dir_);
+      
       // Get the path of optimal tour from path matrix
       getPathForTour(pos, indices, ed_->global_tour_);
 
@@ -452,9 +490,26 @@ void FastExplorationManager::findGlobalTour(
   t1 = ros::Time::now();
 
   // solve the TSP and read the tour as indices
-  solveTSPAndGetTour(cost_mat, indices, ep_->tsp_dir_);
+  // if (init){ // solve at least once to update vars
+  //   solveTSPAndGetTour(cost_mat, ep_->tsp_dir_);
+  //   init = false;
+  // }
+  // else{
+  //   std::thread thread(&fast_planner::FastExplorationManager::solveTSPAndGetTour, this, cost_mat, ep_->tsp_dir_);
+  //   thread.detach();
+  // }
+  // indices = solveTSPAndGetTour(cost_mat, indices, ep_->tsp_dir_);
+  solveTSPAndGetTour(cost_mat, ep_->tsp_dir_);
+  readTourFromFile(indices, ep_->tsp_dir_);
 
-
+  // the latest TSP tour might not have same size as old one
+  // std::vector<int> clipped_indices;
+  // // int size = indices.size()+1;
+  // for (int idx: indices){
+  //   if (idx<(dimension-1))
+  //     clipped_indices.push_back(idx);
+  // }
+  
   // Get the path of optimal tour from path matrix
   frontier_finder_->getPathForTour(cur_pos, indices, ed_->global_tour_);
 
@@ -462,7 +517,7 @@ void FastExplorationManager::findGlobalTour(
   ROS_WARN("Cost mat: %lf, TSP: %lf", mat_time, tsp_time);
 }
 
-void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat, vector<int>& indices, const std::string& file_dir){
+void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat, const std::string& file_dir){
    const int dimension = cost_mat.rows();
 
   // Write params and cost matrix to problem file
@@ -493,42 +548,13 @@ void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat,
   // Call LKH TSP solver
   solveTSPLKH((file_dir + "/single.par").c_str());
 
-  // Read optimal tour from the tour section of result file
-  ifstream res_file(file_dir + "/single.txt");
-  string res;
-  while (getline(res_file, res)) {
-    // Go to tour section
-    if (res.compare("TOUR_SECTION") == 0) break;
-  }
+  std::vector<float> priorities(dimension, 1);
+  // solvePrioTSP(file_dir, cost_mat, priorities);
+  // std::thread tsp_solver_thread(solvePrioTSP, file_dir, cost_mat, priorities);  
+  // tsp_solver_thread.detach();
 
-  if (false) {
-    // Read path for Symmetric TSP formulation
-    getline(res_file, res);  // Skip current pose
-    getline(res_file, res);
-    int id = stoi(res);
-    bool rev = (id == dimension);  // The next node is virutal depot?
 
-    while (id != -1) {
-      indices.push_back(id - 2);
-      getline(res_file, res);
-      id = stoi(res);
-    }
-    if (rev) reverse(indices.begin(), indices.end());
-    indices.pop_back();  // Remove the depot
-
-  } else {
-    // Read path for ATSP formulation
-    while (getline(res_file, res)) {
-      // Read indices of frontiers in optimal tour
-      int id = stoi(res);
-      if (id == 1)  // Ignore the current state
-        continue;
-      if (id == -1) break;
-      indices.push_back(id - 2);  // Idx of solver-2 == Idx of frontier
-    }
-  }
-
-  res_file.close();
+  // mutex.unlock();
 }
 
 // void addTargetstoCostMatrix(Eigen::MatrixXd cost_mat){
@@ -541,6 +567,52 @@ void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat,
 //   for (int i=dim; i<dim + target_vpts.size(); )
 
 // }
+
+void FastExplorationManager::readTourFromFile(vector<int>& indices, const std::string& file_dir){
+    // Read optimal tour from the tour section of result file
+    ifstream res_file(file_dir + "/single.txt");
+    string res;
+    int dimension;
+    while (getline(res_file, res)) {
+      if (res.compare(0, 9, "DIMENSION") == 0) {
+        dimension = stoi(res.substr(12,3));
+        ROS_ERROR_STREAM(res);
+        }
+      // Go to tour section
+      if (res.compare("TOUR_SECTION") == 0) break;
+    }
+    ROS_ERROR("%d", dimension);
+    // mutex.lock();
+    // indices.clear();
+    if (false) {
+      // Read path for Symmetric TSP formulation
+      getline(res_file, res);  // Skip current pose
+      getline(res_file, res);
+      int id = stoi(res);
+      bool rev = (id == dimension);  // The next node is virutal depot?
+
+      while (id != -1) {
+        indices.push_back(id - 2);
+        getline(res_file, res);
+        id = stoi(res);
+      }
+      if (rev) reverse(indices.begin(), indices.end());
+      indices.pop_back();  // Remove the depot
+
+    } else {
+      // Read path for ATSP formulation
+      while (getline(res_file, res)) {
+        // Read indices of frontiers in optimal tour
+        int id = stoi(res);
+        if (id == 1)  // Ignore the current state
+          continue;
+        if (id == -1) break;
+        indices.push_back(id - 2);  // Idx of solver-2 == Idx of frontier
+      }
+    }
+
+    res_file.close();
+}
 
 
 void FastExplorationManager::getTargetCostMatrix(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, Eigen::MatrixXd& cost_mat){
