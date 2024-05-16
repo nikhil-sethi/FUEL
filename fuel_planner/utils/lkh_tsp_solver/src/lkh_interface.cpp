@@ -1,4 +1,8 @@
 #include <lkh_tsp_solver/lkh_interface.h>
+#include <algorithm>
+#include <fstream>
+
+namespace lkh_interface{
 
 int solveTSPLKH(const char* input_file) {
   GainType Cost, OldOptimum;
@@ -129,4 +133,77 @@ int solveTSPLKH(const char* input_file) {
   }
   PrintStatistics();
   return EXIT_SUCCESS;
+}
+
+void readTourFromFile(std::vector<int>& indices, const std::string& file_dir){
+    // Read optimal tour from the tour section of result file
+    std::ifstream res_file(file_dir);
+    std::string res;
+    int dimension;
+    while (getline(res_file, res)) {
+      if (res.compare(0, 9, "DIMENSION") == 0) {
+        dimension = std::stoi(res.substr(12,3));
+        }
+      // Go to tour section
+      if (res.compare("TOUR_SECTION") == 0) break;
+    }
+
+    if (false) {
+      // Read path for Symmetric TSP formulation
+      getline(res_file, res);  // Skip current pose
+      getline(res_file, res);
+      int id = stoi(res);
+      bool rev = (id == dimension);  // The next node is virutal depot?
+
+      while (id != -1) {
+        indices.push_back(id - 2);
+        getline(res_file, res);
+        id = std::stoi(res);
+      }
+      if (rev) std::reverse(indices.begin(), indices.end());
+      indices.pop_back();  // Remove the depot
+
+    } else {
+      // Read path for ATSP formulation
+      while (getline(res_file, res)) {
+        // Read indices of frontiers in optimal tour
+        int id = std::stoi(res);
+        if (id == 1)  // Ignore the current state
+          continue;
+        if (id == -1) break;
+        indices.push_back(id - 2);  // Idx of solver-2 == Idx of frontier
+      }
+    }
+
+    res_file.close();
+}
+
+void writeCostMatToFile(const Eigen::MatrixXd& cost_mat, const std::string& file_dir){
+    uint dimension = cost_mat.rows();
+    // Write params and cost matrix to problem file
+    std::ofstream prob_file(file_dir);
+    // Problem specification part, follow the format of TSPLIB
+
+    std::string prob_spec = "NAME : single\nTYPE : ATSP\nDIMENSION : " + std::to_string(dimension) +
+        "\nEDGE_WEIGHT_TYPE : "
+        "EXPLICIT\nEDGE_WEIGHT_FORMAT : FULL_MATRIX\nEDGE_WEIGHT_SECTION\n";
+
+    prob_file << prob_spec;
+
+    // Problem data part
+    const int scale = 100;
+    // Use Asymmetric TSP
+    for (int i = 0; i < dimension; ++i) {
+      for (int j = 0; j < dimension; ++j) {
+        int int_cost = cost_mat(i, j) * scale;
+        prob_file << int_cost << " ";
+      }
+      prob_file << "\n";
+    }
+    
+
+    prob_file << "EOF";
+    prob_file.close();
+}
+
 }

@@ -18,46 +18,11 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <visualization_msgs/Marker.h>
+#include <target_search/TSP.h>
 
 using namespace Eigen;
 
-void solvePrioTSP(const std::string& file_dir, const Eigen::MatrixXd& cost_mat, const std::vector<float>& priorities){
-  const int dimension = cost_mat.rows();
 
-  // Write params and cost matrix to problem file
-  ofstream prob_file(file_dir + "/single.tsp");
-  // Problem specification part, follow the format of TSPLIB
-
-  string prob_spec = "NAME : single\nTYPE : ATSP\nDIMENSION : " + to_string(dimension) +
-      "\nEDGE_WEIGHT_TYPE : "
-      "EXPLICIT\nEDGE_WEIGHT_FORMAT : FULL_MATRIX\nEDGE_WEIGHT_SECTION\n";
-
-  prob_file << prob_spec;
-
-  // Problem data part
-  const int scale = 100;
-  // Use Asymmetric TSP
-  for (int i = 0; i < dimension; ++i) {
-    for (int j = 0; j < dimension; ++j) {
-      int int_cost = cost_mat(i, j) * scale;
-      prob_file << int_cost << " ";
-    }
-    prob_file << "\n";
-  }
-  
-
-  prob_file << "EOF";
-  prob_file.close();
-
-
-  std::string py_file_str ="python3 /root/thesis_ws/src/thesis/sw/planning/solve_prio_atsp.py ";
-  
-  // add arguments
-  for (float p: priorities)
-    py_file_str += (std::to_string(p)+" ");   
-  ROS_ERROR_STREAM(py_file_str);
-  system(py_file_str.c_str());
-}
 
 namespace fast_planner {
 // SECTION interfaces for setup and query
@@ -139,6 +104,7 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   custom_goal_pose.position.y = -1;
   custom_goal_pose.position.z = 1;
   
+  tsp_client = nh.serviceClient<target_search::TSP>("/planning/motsp_service");
 
 }
 
@@ -185,10 +151,10 @@ int FastExplorationManager::planExploreMotion(
       next_yaw = std::atan2(siny_cosp, cosy_cosp);    
   }
   else if (is_target_search_ && !target_vpts.empty()){
-    int num_targets = target_vpts.size();
+    int num_targets_vpts = target_vpts.size();
     // greedy TODO change this to viewpoint cost to account for yaw as well
     // find the closest viewpoint to current position
-    if (num_targets == 1 || ts_type==TARGET_SEARCH::GREEDY){
+    if (num_targets_vpts == 1 || ts_type==TARGET_SEARCH::GREEDY){
       double min_dist = 10000.0;
       for (auto& vpt: target_vpts){
         double dist = std::sqrt(pow(pos(0) - vpt.position.x, 2) + pow(pos(1) - vpt.position.y, 2) + pow(pos(2) - vpt.position.z, 2));
@@ -207,7 +173,7 @@ int FastExplorationManager::planExploreMotion(
     }
 
     // TSP
-    else if (num_targets>1){
+    else if (num_targets_vpts>1){
       
       // computeExploreTargets();
 
@@ -215,12 +181,15 @@ int FastExplorationManager::planExploreMotion(
       getTargetCostMatrix(pos, vel, yaw, cost_mat);
       
 
-      vector<int> indices;
+      vector<uint8_t> indices;
+      // vector<uint16_t> priorities = vector<uint16_t>(num_targets_vpts+1,1);
       // findTargetTour(cost_mat, indices);
       
       // solve the TSP and read the tour as indices
-      solveTSPAndGetTour(cost_mat, "/root/thesis_ws/src/thesis/sw/bringup/resource");
-      readTourFromFile(indices, ep_->tsp_dir_);
+      // solveTSPAndGetTour(cost_mat, "/root/thesis_ws/src/thesis/sw/bringup/resource");
+      // readTourFromFile(indices, ep_->tsp_dir_);
+
+      solveMOTSP(cost_mat, priorities, indices);
       
       // Get the path of optimal tour from path matrix
       getPathForTour(pos, indices, ed_->global_tour_);
@@ -245,7 +214,7 @@ int FastExplorationManager::planExploreMotion(
     }
 
     frontier_finder_->getTopViewpointsInfo(pos, ed_->points_, ed_->yaws_, ed_->averages_);
-    for (int i = 0; i < ed_->points_.size(); ++i)
+    for (uint i = 0; i < ed_->points_.size(); ++i)
       ed_->views_.push_back(ed_->points_[i] + 2.0 * Vector3d(cos(ed_->yaws_[i]), sin(ed_->yaws_[i]), 0));
 
     double view_time = (ros::Time::now() - t1).toSec();
@@ -374,6 +343,30 @@ int FastExplorationManager::planExploreMotion(
   return SUCCEED;
 }
 
+void FastExplorationManager::solveMOTSP(const Eigen::MatrixXd& cost_mat, const std::vector<uint16_t>& priorities, std::vector<uint8_t>& tour){
+  const uint8_t dimension = cost_mat.rows();
+
+  // get the upper triangular matrix. reconstructed in python later on
+  std::vector<uint16_t> cost_mat_flat;
+  for (int i=0; i<dimension; i++)
+    for (int j=i+1; j<dimension; j++){
+    cost_mat_flat.push_back((uint16_t)(cost_mat(i,j)*1000));
+  }
+
+  target_search::TSP srv;
+  srv.request.cost_mat_flat = cost_mat_flat;
+  srv.request.priorities = priorities;
+  srv.request.dim = dimension;
+
+  // std::vector<int> tour;
+  if (tsp_client.call(srv)){
+    tour = srv.response.tour;
+    assert(tour.size() == dimension-1);
+  }
+  else{
+    ROS_ERROR("Failed to call service add_two_ints");
+  }
+}
 
 int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eigen::Vector3d& vel, const Eigen::Vector3d& acc, const Eigen::Vector3d& yaw, Eigen::Vector3d& next_pos, double next_yaw){
 
@@ -411,7 +404,7 @@ int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eig
 
     // cut the path until the cumulative path length stays within the max radius
     vector<Eigen::Vector3d> truncated_path = { ed_->path_next_goal_.front() };
-    for (int i = 1; i < ed_->path_next_goal_.size() && len2 < radius_far; ++i) {
+    for (uint i = 1; i < ed_->path_next_goal_.size() && len2 < radius_far; ++i) {
       auto cur_pt = ed_->path_next_goal_[i];
       len2 += (cur_pt - truncated_path.back()).norm();
       truncated_path.push_back(cur_pt);
@@ -448,7 +441,7 @@ void FastExplorationManager::shortenPath(vector<Vector3d>& path) {
   // Shorten the tour, only critical intermediate points are reserved.
   const double dist_thresh = 2.0;
   vector<Vector3d> short_tour = { path.front() };
-  for (int i = 1; i < path.size() - 1; ++i) {
+  for (uint i = 1; i < path.size() - 1; ++i) {
     if ((path[i] - short_tour.back()).norm() > dist_thresh)
       short_tour.push_back(path[i]);
     else {
@@ -472,9 +465,7 @@ void FastExplorationManager::shortenPath(vector<Vector3d>& path) {
   path = short_tour;
 }
 
-void FastExplorationManager::findGlobalTour(
-    const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
-    vector<int>& indices) {
+void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, vector<int>& indices) {
   auto t1 = ros::Time::now();
 
   // Get cost matrix for current state and clusters
@@ -488,27 +479,15 @@ void FastExplorationManager::findGlobalTour(
 
   double mat_time = (ros::Time::now() - t1).toSec();
   t1 = ros::Time::now();
+  
+  // Write matrix to file
+  lkh_interface::writeCostMatToFile(cost_mat, ep_->tsp_dir_ + "/single.tsp");
 
-  // solve the TSP and read the tour as indices
-  // if (init){ // solve at least once to update vars
-  //   solveTSPAndGetTour(cost_mat, ep_->tsp_dir_);
-  //   init = false;
-  // }
-  // else{
-  //   std::thread thread(&fast_planner::FastExplorationManager::solveTSPAndGetTour, this, cost_mat, ep_->tsp_dir_);
-  //   thread.detach();
-  // }
-  // indices = solveTSPAndGetTour(cost_mat, indices, ep_->tsp_dir_);
-  solveTSPAndGetTour(cost_mat, ep_->tsp_dir_);
-  readTourFromFile(indices, ep_->tsp_dir_);
-
-  // the latest TSP tour might not have same size as old one
-  // std::vector<int> clipped_indices;
-  // // int size = indices.size()+1;
-  // for (int idx: indices){
-  //   if (idx<(dimension-1))
-  //     clipped_indices.push_back(idx);
-  // }
+  // Call LKH TSP solver
+  lkh_interface::solveTSPLKH((ep_->tsp_dir_ + "/single.par").c_str());
+  
+  // Read tour  
+  lkh_interface::readTourFromFile(indices, ep_->tsp_dir_+ "/single.txt");
   
   // Get the path of optimal tour from path matrix
   frontier_finder_->getPathForTour(cur_pos, indices, ed_->global_tour_);
@@ -517,45 +496,6 @@ void FastExplorationManager::findGlobalTour(
   ROS_WARN("Cost mat: %lf, TSP: %lf", mat_time, tsp_time);
 }
 
-void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat, const std::string& file_dir){
-   const int dimension = cost_mat.rows();
-
-  // Write params and cost matrix to problem file
-  ofstream prob_file(file_dir + "/single.tsp");
-  // Problem specification part, follow the format of TSPLIB
-
-  string prob_spec = "NAME : single\nTYPE : ATSP\nDIMENSION : " + to_string(dimension) +
-      "\nEDGE_WEIGHT_TYPE : "
-      "EXPLICIT\nEDGE_WEIGHT_FORMAT : FULL_MATRIX\nEDGE_WEIGHT_SECTION\n";
-
-  prob_file << prob_spec;
-
-  // Problem data part
-  const int scale = 100;
-  // Use Asymmetric TSP
-  for (int i = 0; i < dimension; ++i) {
-    for (int j = 0; j < dimension; ++j) {
-      int int_cost = cost_mat(i, j) * scale;
-      prob_file << int_cost << " ";
-    }
-    prob_file << "\n";
-  }
-  
-
-  prob_file << "EOF";
-  prob_file.close();
-
-  // Call LKH TSP solver
-  solveTSPLKH((file_dir + "/single.par").c_str());
-
-  std::vector<float> priorities(dimension, 1);
-  // solvePrioTSP(file_dir, cost_mat, priorities);
-  // std::thread tsp_solver_thread(solvePrioTSP, file_dir, cost_mat, priorities);  
-  // tsp_solver_thread.detach();
-
-
-  // mutex.unlock();
-}
 
 // void addTargetstoCostMatrix(Eigen::MatrixXd cost_mat){
 //   const int dim = cost_mat.rows()
@@ -567,53 +507,6 @@ void FastExplorationManager::solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat,
 //   for (int i=dim; i<dim + target_vpts.size(); )
 
 // }
-
-void FastExplorationManager::readTourFromFile(vector<int>& indices, const std::string& file_dir){
-    // Read optimal tour from the tour section of result file
-    ifstream res_file(file_dir + "/single.txt");
-    string res;
-    int dimension;
-    while (getline(res_file, res)) {
-      if (res.compare(0, 9, "DIMENSION") == 0) {
-        dimension = stoi(res.substr(12,3));
-        ROS_ERROR_STREAM(res);
-        }
-      // Go to tour section
-      if (res.compare("TOUR_SECTION") == 0) break;
-    }
-    ROS_ERROR("%d", dimension);
-    // mutex.lock();
-    // indices.clear();
-    if (false) {
-      // Read path for Symmetric TSP formulation
-      getline(res_file, res);  // Skip current pose
-      getline(res_file, res);
-      int id = stoi(res);
-      bool rev = (id == dimension);  // The next node is virutal depot?
-
-      while (id != -1) {
-        indices.push_back(id - 2);
-        getline(res_file, res);
-        id = stoi(res);
-      }
-      if (rev) reverse(indices.begin(), indices.end());
-      indices.pop_back();  // Remove the depot
-
-    } else {
-      // Read path for ATSP formulation
-      while (getline(res_file, res)) {
-        // Read indices of frontiers in optimal tour
-        int id = stoi(res);
-        if (id == 1)  // Ignore the current state
-          continue;
-        if (id == -1) break;
-        indices.push_back(id - 2);  // Idx of solver-2 == Idx of frontier
-      }
-    }
-
-    res_file.close();
-}
-
 
 void FastExplorationManager::getTargetCostMatrix(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, Eigen::MatrixXd& cost_mat){
       // Eigen::MatrixXd cost_mat;
@@ -682,7 +575,7 @@ void FastExplorationManager::getTargetCostMatrix(const Vector3d& cur_pos, const 
 
 // }
 
-void FastExplorationManager::getPathForTour(const Vector3d& pos, const vector<int>& ids, vector<Vector3d>& expanded_path){
+void FastExplorationManager::getPathForTour(const Vector3d& pos, const vector<uint8_t>& ids, vector<Vector3d>& expanded_path){
   
   
   // Compute the path from current pos to the first frontier
@@ -784,9 +677,9 @@ void FastExplorationManager::refineLocalTour(
   // ROS_WARN("create: %lf, search: %lf, parse: %lf", create_time, search_time, parse_time);
 }
 
-
-void FastExplorationManager::targetViewpointsCallback(const geometry_msgs::PoseArray& msg){
-  target_vpts = msg.poses;
+void FastExplorationManager::targetViewpointsCallback(const common_msgs::Viewpoints& msg){
+  target_vpts = msg.viewpoints.poses;
+  priorities = msg.priorities;
 }
 
 void FastExplorationManager::customPoseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg){

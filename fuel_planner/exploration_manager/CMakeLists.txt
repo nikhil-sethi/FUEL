@@ -24,6 +24,8 @@ find_package(catkin REQUIRED COMPONENTS
   plan_manage
   cv_bridge
   std_srvs
+  common_msgs
+  target_search
 )
 
 catkin_package(

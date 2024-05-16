@@ -9,6 +9,7 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <mutex>
+#include <common_msgs/Viewpoints.h>
 
 using Eigen::Vector3d;
 using std::shared_ptr;
@@ -52,9 +53,11 @@ private:
   shared_ptr<EDTEnvironment> edt_environment_;
   shared_ptr<SDFMap> sdf_map_;
   std::vector<geometry_msgs::Pose> target_vpts;
+  std::vector<uint16_t> priorities;
   std::vector<std::vector<std::vector<Eigen::Vector3d>>> target_paths; // for each point in tour: line segments (start(vec3d) --> end (vec3d)) to each other point in tour
   ros::Subscriber vpts_sub, custom_goal_pose_sub;
   geometry_msgs::Pose custom_goal_pose;
+  ros::ServiceClient tsp_client;
   bool CUSTOM_GOAL = false;
   bool is_target_search_ = false;
 
@@ -68,14 +71,14 @@ private:
                        vector<Vector3d>& refined_pts, vector<double>& refined_yaws);
 
   void shortenPath(vector<Vector3d>& path);
-  void targetViewpointsCallback(const geometry_msgs::PoseArray& msg);
+  void targetViewpointsCallback(const common_msgs::Viewpoints& msg);
   void customPoseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg);
-  void solveTSPAndGetTour(const Eigen::MatrixXd& cost_mat, const std::string& file_dir);
   // void findTargetTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, vector<int>& indices);
-  void getPathForTour(const Vector3d& pos, const vector<int>& ids, vector<Vector3d>& path);
+  void getPathForTour(const Vector3d& pos, const vector<uint8_t>& ids, vector<Vector3d>& path);
   int getTrajToView(const Eigen::Vector3d& pos,  const Eigen::Vector3d& vel, const Eigen::Vector3d& acc, const Eigen::Vector3d& yaw, Eigen::Vector3d& next_pos, double next_yaw);
   void getTargetCostMatrix(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, Eigen::MatrixXd& cost_mat);
   void readTourFromFile(vector<int>& indices, const std::string& file_dir);
+  void solveMOTSP(const Eigen::MatrixXd& cost_mat, const std::vector<uint16_t>& priorities, std::vector<uint8_t>& tour);
 
 public:
   typedef shared_ptr<FastExplorationManager> Ptr;

@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS "-O3 -Wall")
 find_package(catkin REQUIRED COMPONENTS
   roscpp
 )
-
+find_package(Eigen3 REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES lkh_tsp_solver
@@ -20,6 +20,7 @@ catkin_package(
 include_directories( 
     SYSTEM 
     include 
+    ${EIGEN3_INCLUDE_DIRS} 
 )
 
 file( GLOB SRCS src/*.c )
