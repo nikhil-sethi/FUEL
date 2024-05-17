@@ -19,6 +19,7 @@ class Mat;
 
 class RayCaster;
 class AttentionMap;
+class Diffuser;
 
 namespace fast_planner {
 struct MapParam;
@@ -32,7 +33,7 @@ public:
 
   enum OCCUPANCY { UNKNOWN, FREE, OCCUPIED };
 
-  void initMap(ros::NodeHandle& nh);
+  void initMap(MapROS* map_ros, ros::NodeHandle& nh);
   void inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& points, const int& point_num,
                        const Eigen::Vector3d& camera_pos);
 
@@ -84,11 +85,12 @@ private:
 
   unique_ptr<MapParam> mp_;
   unique_ptr<MapData> md_;
-  unique_ptr<MapROS> mr_;
+  shared_ptr<MapROS> mr_;
   unique_ptr<RayCaster> caster_;
 
   friend MapROS;
   friend class ::AttentionMap; // in global namespace
+  friend class ::Diffuser;
   std::vector<float> attention_buffer_gt;
 
 

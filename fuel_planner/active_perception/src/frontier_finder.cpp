@@ -118,6 +118,9 @@ void FrontierFinder::searchFrontiers() {
   splitLargeFrontiers(tmp_frontiers_);
 
   ROS_WARN_THROTTLE(5.0, "Frontier t: %lf", (ros::Time::now() - t1).toSec());
+
+  int sum = std::accumulate(frontier_flag_.begin(), frontier_flag_.end(), 0);
+  std::cout<<"ff "<< sum<<std::endl;
 }
 
 // void FrontierFinder::searchObjects(){
@@ -222,7 +225,7 @@ void FrontierFinder::expandFrontier(
         continue;
 
       edt_env_->sdf_map_->indexToPos(nbr, pos);
-      if (pos[2] < 0.1) continue;  // Remove noise close to ground
+      if (pos[2] < 0.01) continue;  // Remove noise close to ground
       expanded.push_back(pos);
       cell_queue.push(nbr);
       frontier_flag_[adr] = 1;
@@ -344,7 +347,7 @@ void FrontierFinder::updateFrontierCostMatrix() {
       auto cost_iter = it->costs_.begin();
       auto path_iter = it->paths_.begin();
       int iter_idx = 0;
-      for (int i = 0; i < removed_ids_.size(); ++i) {
+      for (uint i = 0; i < removed_ids_.size(); ++i) {
         // Step iterator to the item to be removed
         while (iter_idx < removed_ids_[i]) {
           ++cost_iter;
@@ -592,7 +595,7 @@ void FrontierFinder::getPathForTour(
   path.insert(path.end(), segment.begin(), segment.end());
 
   // Get paths of tour passing all clusters
-  for (int i = 0; i < frontier_ids.size() - 1; ++i) {
+  for (uint i = 0; i < frontier_ids.size() - 1; ++i) {
     // Move to path to next cluster
     auto path_iter = frontier_indexer[frontier_ids[i]]->paths_.begin();
     int next_idx = frontier_ids[i + 1];
@@ -723,7 +726,7 @@ void FrontierFinder::sampleViewpoints(Frontier& frontier) {
       auto& cells = frontier.filtered_cells_;
       Eigen::Vector3d ref_dir = (cells.front() - sample_pos).normalized();
       double avg_yaw = 0.0;
-      for (int i = 1; i < cells.size(); ++i) {
+      for (uint i = 1; i < cells.size(); ++i) {
         Eigen::Vector3d dir = (cells[i] - sample_pos).normalized();
         double yaw = acos(dir.dot(ref_dir));
         if (ref_dir.cross(dir)[2] < 0) yaw = -yaw;
@@ -893,13 +896,13 @@ inline vector<Eigen::Vector3i> FrontierFinder::tenNeighbors(const Eigen::Vector3
   return neighbors;
 }
 
-inline vector<Eigen::Vector3i> FrontierFinder::allNeighbors(const Eigen::Vector3i& voxel) {
-  vector<Eigen::Vector3i> neighbors(26);
+vector<Eigen::Vector3i> FrontierFinder::allNeighbors(const Eigen::Vector3i& voxel, int depth) {
+  vector<Eigen::Vector3i> neighbors(pow(2*depth+1, 3)-1);
   Eigen::Vector3i tmp;
   int count = 0;
-  for (int x = -1; x <= 1; ++x)
-    for (int y = -1; y <= 1; ++y)
-      for (int z = -1; z <= 1; ++z) {
+  for (int x = -depth; x <= depth; ++x)
+    for (int y = -depth; y <= depth; ++y)
+      for (int z = -depth; z <= depth; ++z) {
         if (x == 0 && y == 0 && z == 0) continue;
         tmp = voxel + Eigen::Vector3i(x, y, z);
         neighbors[count++] = tmp;

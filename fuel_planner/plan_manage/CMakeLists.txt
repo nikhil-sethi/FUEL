@@ -31,7 +31,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES plan_manage
- CATKIN_DEPENDS plan_env path_searching bspline bspline_opt active_perception traj_utils)
+ CATKIN_DEPENDS plan_env path_searching bspline bspline_opt active_perception traj_utils attention_map)
 
 include_directories(
   include
@@ -42,22 +42,22 @@ include_directories(
 )
 
 
-add_executable(fast_planner_node
-  src/fast_planner_node.cpp 
-  src/kino_replan_fsm.cpp
-  src/topo_replan_fsm.cpp
-  test/local_explore_fsm.cpp
-  src/planner_manager.cpp
-  src/planner_manager_dev.cpp
-  )
-target_link_libraries(fast_planner_node 
-  ${catkin_LIBRARIES}
-  -ldw
-  )
+# add_executable(fast_planner_node
+  # src/fast_planner_node.cpp 
+  # src/kino_replan_fsm.cpp
+  # src/topo_replan_fsm.cpp
+  # test/local_explore_fsm.cpp
+  # src/planner_manager.cpp
+  # src/planner_manager_dev.cpp
+  # )
+# target_link_libraries(fast_planner_node 
+#   ${catkin_LIBRARIES}
+#   -ldw
+#   )
 
 add_library(plan_manage 
   src/planner_manager.cpp
-  src/planner_manager_dev.cpp
+  # src/planner_manager_dev.cpp
   )
 target_link_libraries(plan_manage ${catkin_LIBRARIES})
 

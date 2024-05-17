@@ -9,11 +9,16 @@
 #include <path_searching/topo_prm.h>
 
 #include <plan_env/edt_environment.h>
+#include <plan_env/map_ros.h>
 
 #include <active_perception/frontier_finder.h>
 #include <active_perception/heading_planner.h>
 
 #include <plan_manage/plan_container.hpp>
+
+#include <plan_env/attention_map.h>
+#include <active_perception/diffuser.h>
+
 
 #include <ros/ros.h>
 
@@ -56,11 +61,14 @@ public:
   EDTEnvironment::Ptr edt_environment_;
   unique_ptr<Astar> path_finder_;
   unique_ptr<TopologyPRM> topo_prm_;
+  shared_ptr<Diffuser> diffuser_;
 
 private:
   /* main planning algorithms & modules */
+  shared_ptr<MapROS> _map_ros;
   shared_ptr<SDFMap> sdf_map_;
-
+  shared_ptr<AttentionMap> _att_map;
+  
   unique_ptr<KinodynamicAstar> kino_path_finder_;
   vector<BsplineOptimizer::Ptr> bspline_optimizers_;
 
@@ -95,7 +103,7 @@ public:
   void searchFrontier(const Eigen::Vector3d& p);
 
 private:
-  unique_ptr<FrontierFinder> frontier_finder_;
+  // shared_ptr<FrontierFinder> frontier_finder_;
   unique_ptr<HeadingPlanner> heading_planner_;
   unique_ptr<VisibilityUtil> visib_util_;
 

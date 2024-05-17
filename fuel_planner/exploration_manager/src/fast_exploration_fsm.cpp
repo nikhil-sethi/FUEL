@@ -262,11 +262,11 @@ void FastExplorationFSM::visualize() {
     // "frontier_boxes", i, 4);
   }
   last_ftr_num = ed_ptr->frontiers_.size();
-  // for (int i = 0; i < ed_ptr->dead_frontiers_.size(); ++i)
-  //   visualization_->drawCubes(ed_ptr->dead_frontiers_[i], 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier",
-  //                             i, 4);
-  // for (int i = ed_ptr->dead_frontiers_.size(); i < 5; ++i)
-  //   visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier", i, 4);
+  for (int i = 0; i < ed_ptr->dead_frontiers_.size(); ++i)
+    visualization_->drawCubes(ed_ptr->dead_frontiers_[i], 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier",
+                              i, 4);
+  for (int i = ed_ptr->dead_frontiers_.size(); i < 5; ++i)
+    visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier", i, 4);
 
   // Draw global top viewpoints info
   visualization_->drawSpheres(ed_ptr->points_, 0.2, Vector4d(1, 0, 0, 1), "points", 0, 6);

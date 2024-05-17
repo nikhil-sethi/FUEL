@@ -43,6 +43,7 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   sdf_map_ = edt_environment_->sdf_map_;
   frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
   // view_finder_.reset(new ViewFinder(edt_environment_, nh));
+  planner_manager_->diffuser_->setFrontierFinder(frontier_finder_);
 
   ed_.reset(new ExplorationData);
   ep_.reset(new ExplorationParam);
@@ -112,6 +113,8 @@ int FastExplorationManager::planExploreMotion(
     const Vector3d& pos, const Vector3d& vel, const Vector3d& acc, const Vector3d& yaw) {
   ros::Time t1 = ros::Time::now();
   auto t2 = t1;
+
+
   ed_->views_.clear();
   ed_->global_tour_.clear();
   int ts_type = TARGET_SEARCH::TSP;
@@ -122,6 +125,9 @@ int FastExplorationManager::planExploreMotion(
   // ===== FIND FRONTIERS =======
   // Search frontiers and group them into clusters
   frontier_finder_->searchFrontiers();
+
+  // int sum = std::accumulate(frontier_finder_->frontier_flag_.begin(), frontier_finder_->frontier_flag_.end(), 0);
+  // std::cout<< sum<<std::endl;
 
   double frontier_time = (ros::Time::now() - t1).toSec();
   t1 = ros::Time::now();

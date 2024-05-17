@@ -16,9 +16,12 @@
 #include <memory>
 #include <random>
 
+#include <plan_env/attention_map.h>
 using std::shared_ptr;
 using std::normal_distribution;
 using std::default_random_engine;
+
+class AttentionMap;
 
 namespace fast_planner {
 class SDFMap;
@@ -28,7 +31,9 @@ public:
   MapROS();
   ~MapROS();
   void setMap(SDFMap* map);
-  void init();
+  void setAttentionMap(std::shared_ptr<AttentionMap> att_map);
+
+  void init(ros::NodeHandle& nh);
 
 private:
   void depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
@@ -65,6 +70,7 @@ private:
   std::fstream entropy_file;
 
   SDFMap* map_;
+  std::shared_ptr<AttentionMap> _att_map;
   // may use ExactTime?
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped>
       SyncPolicyImagePose;
@@ -78,7 +84,7 @@ private:
       SyncPolicyCloudPose;
   typedef shared_ptr<message_filters::Synchronizer<SyncPolicyCloudPose>> SynchronizerCloudPose;
 
-  ros::NodeHandle node_;
+  // ros::NodeHandle node_;
   shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depth_sub_;
   shared_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> cloud_sub_;
   shared_ptr<message_filters::Subscriber<geometry_msgs::PoseStamped>> pose_sub_;

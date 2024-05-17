@@ -16,6 +16,7 @@ using std::list;
 using std::pair;
 
 class RayCaster;
+class Diffuser;
 
 namespace fast_planner {
 class EDTEnvironment;
@@ -48,6 +49,7 @@ struct Frontier {
   // Path and cost from this cluster to other clusters
   list<vector<Vector3d>> paths_;
   list<double> costs_;
+  vector<float> gains_; // information gain diffused from priority map
 };
 
 class FrontierFinder {
@@ -78,6 +80,9 @@ public:
   void wrapYaw(double& yaw);
 
   shared_ptr<PerceptionUtils> percep_utils_;
+  friend class ::Diffuser;
+  vector<Eigen::Vector3i> allNeighbors(const Eigen::Vector3i& voxel, int depth=1);
+  vector<char> frontier_flag_;
 
 private:
   void splitLargeFrontiers(list<Frontier>& frontiers);
@@ -94,7 +99,6 @@ private:
   bool isNearUnknown(const Vector3d& pos);
   vector<Eigen::Vector3i> sixNeighbors(const Eigen::Vector3i& voxel);
   vector<Eigen::Vector3i> tenNeighbors(const Eigen::Vector3i& voxel);
-  vector<Eigen::Vector3i> allNeighbors(const Eigen::Vector3i& voxel);
   bool isNeighborUnknown(const Eigen::Vector3i& voxel);
   void expandFrontier(const Eigen::Vector3i& first /* , const int& depth, const int& parent_id */);
 
@@ -110,7 +114,7 @@ private:
   void findViewpoints(const Vector3d& sample, const Vector3d& ftr_avg, vector<Viewpoint>& vps);
 
   // Data
-  vector<char> frontier_flag_;
+  
   list<Frontier> frontiers_, dormant_frontiers_, tmp_frontiers_;
   vector<int> removed_ids_;
   list<Frontier>::iterator first_new_ftr_;

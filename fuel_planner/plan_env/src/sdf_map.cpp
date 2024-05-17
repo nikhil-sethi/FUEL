@@ -116,16 +116,16 @@ void SDFMap::loadGTAttMap(){
 }
 
 
-void SDFMap::initMap(ros::NodeHandle& nh) {
+void SDFMap::initMap(MapROS* map_ros, ros::NodeHandle& nh) {
   // mp_.reset(new MapParam);
   // md_.reset(new MapData);
   setParams(nh);
-  mr_.reset(new MapROS);
+  mr_.reset(map_ros);
 
   // Initialize ROS wrapper
   mr_->setMap(this);
-  mr_->node_ = nh;
-  mr_->init();
+  // mr_->node_ = nh;
+  // mr_->init();
 
   caster_.reset(new RayCaster);
   caster_->setParams(mp_->resolution_, mp_->map_origin_);

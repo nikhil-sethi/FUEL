@@ -17,6 +17,7 @@ plan_env
 bspline
 path_searching
 cv_bridge
+common
 )
 
 
@@ -41,6 +42,7 @@ add_library( active_perception
     src/frontier_finder.cpp
     src/graph_node.cpp
     src/perception_utils.cpp
+    src/diffuser.cpp
     )
 target_link_libraries( active_perception
     ${catkin_LIBRARIES} 

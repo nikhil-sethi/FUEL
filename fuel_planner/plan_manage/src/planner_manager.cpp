@@ -46,11 +46,25 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
   nh.param("manager/use_active_perception", use_active_perception, false);
 
   local_data_.traj_id_ = 0;
+
+  _map_ros.reset(new MapROS);
+  _map_ros->init(nh);
+
   sdf_map_.reset(new SDFMap);
-  sdf_map_->initMap(nh);
+  sdf_map_->initMap(_map_ros.get(), nh);
+
   edt_environment_.reset(new EDTEnvironment);
   edt_environment_->setMap(sdf_map_);
+  
 
+  _att_map.reset(new AttentionMap);
+  _att_map->setSDFMap(sdf_map_);
+  _att_map->init(nh); // needs map to be set first
+
+  _map_ros->setAttentionMap(_att_map);
+  edt_environment_->setAttentionMap(_att_map);
+
+  
   if (use_geometric_path) {
     path_finder_.reset(new Astar);
     // path_finder_->setParam(nh);
@@ -82,13 +96,20 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
   }
 
   if (use_active_perception) {
-    frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
+    // frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
     // heading_planner_.reset(new HeadingPlanner(nh));
     // heading_planner_->setMap(sdf_map_);
     visib_util_.reset(new VisibilityUtil(nh));
     visib_util_->setEDTEnvironment(edt_environment_);
     plan_data_.view_cons_.idx_ = -1;
   }
+
+  bool use_diffusion = true;
+  if (use_diffusion){
+    diffuser_.reset(new Diffuser(edt_environment_, nh));
+    // diffuser_->setFrontierFinder(frontier_finder_);
+  }
+
 }
 
 void FastPlannerManager::setGlobalWaypoints(vector<Eigen::Vector3d>& waypoints) {

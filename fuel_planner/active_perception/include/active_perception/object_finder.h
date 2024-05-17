@@ -1,0 +1,7 @@
+
+
+class ObjectFinder{
+    public:
+        setAttentionMap()
+
+};
