@@ -11,20 +11,24 @@ class Diffuser{
         std::vector<float> diffusion_buffer;
 
     private:
+        // Member functions
         void diffusionTimer(const ros::TimerEvent& event);
         void publishDiffusionMap();
+        float partialConvolution(const Eigen::Vector3i& voxel);
 
-        float diffuse(const Eigen::Vector3i& bu_voxel);
-
+        // Member variables
         std::shared_ptr<AttentionMap> _att_map;
         std::shared_ptr<fast_planner::SDFMap> _sdf_map;
         std::shared_ptr<fast_planner::FrontierFinder> _ff;
-        // diffuse()
+        std::vector<std::vector<std::vector<float>>> _kernel_weights;
 
         ros::Timer _diffusion_timer;
         ros::Publisher _map_pub;
 
-        float _diffusion_factor;
+        // float _diffusion_factor;
         float _att_min;
+        int _kernel_sigma;
+        int _kernel_size;
+        int _kernel_depth;
 };
 
