@@ -57,12 +57,12 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
   edt_environment_->setMap(sdf_map_);
   
 
-  _att_map.reset(new AttentionMap);
-  _att_map->setSDFMap(sdf_map_);
-  _att_map->init(nh); // needs map to be set first
+  att_map.reset(new AttentionMap);
+  att_map->setSDFMap(sdf_map_);
+  att_map->init(nh); // needs map to be set first
 
-  _map_ros->setAttentionMap(_att_map);
-  edt_environment_->setAttentionMap(_att_map);
+  _map_ros->setAttentionMap(att_map);
+  edt_environment_->setAttentionMap(att_map);
 
   
   if (use_geometric_path) {

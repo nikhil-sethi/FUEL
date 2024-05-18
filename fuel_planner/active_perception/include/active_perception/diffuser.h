@@ -1,3 +1,6 @@
+#ifndef DIFFUSION_H
+#define DIFFUSION_H
+
 #include <plan_env/edt_environment.h>
 #include <plan_env/attention_map.h>
 #include <active_perception/frontier_finder.h>
@@ -32,3 +35,4 @@ class Diffuser{
         int _kernel_depth;
 };
 
+#endif

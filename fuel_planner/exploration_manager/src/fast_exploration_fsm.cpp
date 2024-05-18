@@ -2,7 +2,7 @@
 #include <plan_manage/planner_manager.h>
 #include <exploration_manager/fast_exploration_manager.h>
 #include <traj_utils/planning_visualization.h>
-
+#include <active_perception/object_finder.h>
 #include <exploration_manager/fast_exploration_fsm.h>
 #include <exploration_manager/expl_data.h>
 #include <plan_env/edt_environment.h>
@@ -300,6 +300,15 @@ void FastExplorationFSM::visualize() {
                               Vector4d(1, 1, 0, 1));
   // visualization_->drawSpheres(plan_data->kino_path_, 0.1, Vector4d(1, 0, 1, 1), "kino_path", 0, 0);
   // visualization_->drawLines(ed_ptr->path_next_goal_, 0.05, Vector4d(0, 1, 1, 1), "next_goal", 1, 6);
+
+
+    int i=0;
+    for (Object& object: expl_manager_->object_finder->global_objects ){
+        visualization_->drawBox(object.centroid_, object.scale_, Eigen::Vector4d(0.5, 0, 1, 0.3), "box"+std::to_string(i), i, 7);
+        i++;
+    }
+
+
 }
 
 void FastExplorationFSM::clearVisMarker() {

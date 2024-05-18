@@ -18,6 +18,7 @@ bspline
 path_searching
 cv_bridge
 common
+# traj_utils
 )
 
 
@@ -43,6 +44,8 @@ add_library( active_perception
     src/graph_node.cpp
     src/perception_utils.cpp
     src/diffuser.cpp
+    src/object_finder.cpp
+    src/target_planner.cpp
     )
 target_link_libraries( active_perception
     ${catkin_LIBRARIES} 

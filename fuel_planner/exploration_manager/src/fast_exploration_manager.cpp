@@ -11,6 +11,7 @@
 #include <plan_env/sdf_map.h>
 #include <plan_env/edt_environment.h>
 #include <active_perception/frontier_finder.h>
+#include <active_perception/object_finder.h>
 #include <plan_manage/planner_manager.h>
 
 #include <exploration_manager/expl_data.h>
@@ -42,6 +43,12 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   edt_environment_ = planner_manager_->edt_environment_;
   sdf_map_ = edt_environment_->sdf_map_;
   frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
+  
+  object_finder.reset(new ObjectFinder(nh));
+  object_finder->setPriorityMap(planner_manager_->att_map);
+  object_finder->setDiffusionMap(planner_manager_->diffuser_);
+  object_finder->setSDFMap(sdf_map_);
+
   // view_finder_.reset(new ViewFinder(edt_environment_, nh));
   planner_manager_->diffuser_->setFrontierFinder(frontier_finder_);
 

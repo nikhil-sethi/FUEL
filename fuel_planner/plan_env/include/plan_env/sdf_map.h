@@ -20,6 +20,7 @@ class Mat;
 class RayCaster;
 class AttentionMap;
 class Diffuser;
+class ObjectFinder;
 
 namespace fast_planner {
 struct MapParam;
@@ -91,6 +92,7 @@ private:
   friend MapROS;
   friend class ::AttentionMap; // in global namespace
   friend class ::Diffuser;
+  friend class ::ObjectFinder;
   std::vector<float> attention_buffer_gt;
 
 

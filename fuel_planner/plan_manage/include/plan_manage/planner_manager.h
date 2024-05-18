@@ -62,12 +62,13 @@ public:
   unique_ptr<Astar> path_finder_;
   unique_ptr<TopologyPRM> topo_prm_;
   shared_ptr<Diffuser> diffuser_;
+  shared_ptr<AttentionMap> att_map;
 
 private:
   /* main planning algorithms & modules */
   shared_ptr<MapROS> _map_ros;
   shared_ptr<SDFMap> sdf_map_;
-  shared_ptr<AttentionMap> _att_map;
+
   
   unique_ptr<KinodynamicAstar> kino_path_finder_;
   vector<BsplineOptimizer::Ptr> bspline_optimizers_;

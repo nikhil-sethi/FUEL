@@ -16,6 +16,8 @@ using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
 
+class ObjectFinder;
+
 namespace fast_planner {
 class EDTEnvironment;
 class SDFMap;
@@ -45,7 +47,8 @@ public:
   shared_ptr<ExplorationParam> ep_;
   shared_ptr<FastPlannerManager> planner_manager_;
   shared_ptr<FrontierFinder> frontier_finder_;
-  // unique_ptr<ViewFinder> view_finder_;
+  shared_ptr<ObjectFinder> object_finder;
+  // unique_ptr<ViewFinder> view_finder_;1
 
   shared_ptr<SDFMap> getSDFMapPtr(){return sdf_map_;}
 
