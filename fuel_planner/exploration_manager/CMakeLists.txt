@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   std_srvs
   common_msgs
+  sensor_model
   target_search
 )
 

@@ -21,6 +21,7 @@ class RayCaster;
 class AttentionMap;
 class Diffuser;
 class ObjectFinder;
+class TargetPlanner;
 
 namespace fast_planner {
 struct MapParam;
@@ -54,6 +55,8 @@ public:
   int getOccupancy(const int& id);
 
   float getAttention(const Eigen::Vector3i& id);
+
+  bool isNearUnknown(const Eigen::Vector3d& pos, double clearance);
 
   void setOccupied(const Eigen::Vector3d& pos, const int& occ = 1);
   int getInflateOccupancy(const Eigen::Vector3d& pos);
@@ -93,6 +96,7 @@ private:
   friend class ::AttentionMap; // in global namespace
   friend class ::Diffuser;
   friend class ::ObjectFinder;
+  friend class ::TargetPlanner;
   std::vector<float> attention_buffer_gt;
 
 

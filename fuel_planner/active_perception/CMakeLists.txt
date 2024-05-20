@@ -18,6 +18,8 @@ bspline
 path_searching
 cv_bridge
 common
+sensor_model
+common_msgs
 # traj_utils
 )
 

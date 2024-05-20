@@ -308,6 +308,52 @@ void FastExplorationFSM::visualize() {
         i++;
     }
 
+    Eigen::Matrix<double, 4, 4> colormap;
+    // // jet colormap
+    colormap <<
+        0 ,0,255,1, // blue
+        0,255,0,1, // green
+        255,255,0,1, //yellow
+        255,0,0,1; // red
+    colormap = colormap/255;
+
+    float min_gain = 10; 
+    float max_gain=150;
+    // std::vector<Eigen::Vector3d> vpt_positions;
+    std::vector<Eigen::Vector4d> vpt_colors;
+    // for (Object& object: expl_manager_->object_finder->global_objects ){
+      
+    //   for (uint j = 0; j < std::min((int)object.viewpoints.size(), 3); j++){
+    //       auto vpt = object.viewpoints[j];
+    //       vpt_positions.push_back(vpt.posToEigen());
+    //       vpt_colors.push_back(vpt.getColor(min_gain, max_gain, colormap));
+    //   }
+    // }
+    // visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "top viewpoints", 1, 6);
+
+
+    // int j=0, k=0;
+    // for (auto vpts: expl_manager_->target_vpts){
+    //     j++;
+        std::vector<Eigen::Vector3d> vpt_positions;
+        Eigen::Vector3d pos;
+        int k = 0;
+        
+        for (auto vpt: expl_manager_->target_vpts){
+          
+          pos(0) = vpt.position.x;
+          pos(1) = vpt.position.y;
+          pos(2) = vpt.position.z;
+            // vpt_positions.push_back(vpt.posToEigen());
+            vpt_positions.push_back(pos);
+            
+            Eigen::Vector4d color = getColor(expl_manager_->priorities[k], min_gain, max_gain, colormap);
+            vpt_colors.push_back(color);
+            k++;
+        }
+        if (!vpt_positions.empty()) visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "points_", 1, 6);
+
+    // }
 
 }
 

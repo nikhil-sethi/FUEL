@@ -17,6 +17,7 @@ using std::unique_ptr;
 using std::vector;
 
 class ObjectFinder;
+class TargetPlanner;
 
 namespace fast_planner {
 class EDTEnvironment;
@@ -48,15 +49,18 @@ public:
   shared_ptr<FastPlannerManager> planner_manager_;
   shared_ptr<FrontierFinder> frontier_finder_;
   shared_ptr<ObjectFinder> object_finder;
+  shared_ptr<TargetPlanner> target_planner_;
   // unique_ptr<ViewFinder> view_finder_;1
 
   shared_ptr<SDFMap> getSDFMapPtr(){return sdf_map_;}
+  std::vector<geometry_msgs::Pose> target_vpts;
+  std::vector<uint16_t> priorities;
 
 private:
   shared_ptr<EDTEnvironment> edt_environment_;
   shared_ptr<SDFMap> sdf_map_;
-  std::vector<geometry_msgs::Pose> target_vpts;
-  std::vector<uint16_t> priorities;
+  
+  
   std::vector<std::vector<std::vector<Eigen::Vector3d>>> target_paths; // for each point in tour: line segments (start(vec3d) --> end (vec3d)) to each other point in tour
   ros::Subscriber vpts_sub, custom_goal_pose_sub;
   geometry_msgs::Pose custom_goal_pose;

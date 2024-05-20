@@ -587,5 +587,18 @@ double SDFMap::getDistWithGrad(const Eigen::Vector3d& pos, Eigen::Vector3d& grad
 
   return dist;
 }
+
+bool SDFMap::isNearUnknown(const Eigen::Vector3d& pos, double clearance) {
+  const int vox_num = floor(clearance /  mp_->resolution_);
+  for (int x = -vox_num; x <= vox_num; ++x)
+    for (int y = -vox_num; y <= vox_num; ++y)
+      for (int z = -1; z <= 1; ++z) {
+        Eigen::Vector3d vox;
+        vox << pos[0] + x *  mp_->resolution_, pos[1] + y *  mp_->resolution_, pos[2] + z *  mp_->resolution_;
+        if (getOccupancy(vox) == UNKNOWN) return true;
+      }
+  return false;
+}
+
 }  // namespace fast_planner
 // SDFMap

@@ -6,8 +6,6 @@
 #include <string>
 
 typedef std::pair<Vector3d, Vector3d> BoundingBox;
-// Eigen::Vector3d origin(-5.5, -5.5, 0);
-
 
 bool checkOverlap(const BoundingBox& box1, const BoundingBox& box2) {
     for (int i = 0; i < 3; ++i) {
@@ -38,11 +36,11 @@ ObjectFinder::ObjectFinder(ros::NodeHandle& nh){
     nh.param("/object_finder/global_iou_thresh", _global_iou_thresh, 0.5f); 
     nh.param("/object_finder/local_iou_thresh", _local_iou_thresh, 0.5f); 
 
-    _obj_update_timer = nh.createTimer(ros::Duration(0.05), &ObjectFinder::objectUpdateTimer, this);
+    _obj_update_timer = nh.createTimer(ros::Duration(0.05), &ObjectFinder::objectFusionTimer, this);
 
 }
 
-void ObjectFinder::objectUpdateTimer(const ros::TimerEvent& e){
+void ObjectFinder::objectFusionTimer(const ros::TimerEvent& e){
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr local_cloud(new pcl::PointCloud<pcl::PointXYZI>);
 
@@ -62,16 +60,12 @@ void ObjectFinder::objectUpdateTimer(const ros::TimerEvent& e){
                 int adr = _sdf_map->toAddress(x,y,z);
                 float priority = _prio_map->priority_buffer[adr];
 
-                // ROS_WARN("check1");
                 if (priority < _att_min || !(_sdf_map->getOccupancy(adr) == fast_planner::SDFMap::OCCUPIED)) {
                     _prio_map->priority_buffer[adr] = 0; // cleanup
                     continue;
                 }
-                // ROS_WARN("check2");
-                
                 
                 _sdf_map->indexToPos(adr, pos);
-                // ROS_WARN("check3");
                 pcl_pt.x = pos[0];
                 pcl_pt.y = pos[1];
                 pcl_pt.z = pos[2];
@@ -81,9 +75,9 @@ void ObjectFinder::objectUpdateTimer(const ros::TimerEvent& e){
             }
 
     std::list<Object> local_objects;    
-    // ROS_WARN("SDGDF %d", local_cloud->size());
+
     createObjects(local_cloud, local_objects); // cluster the global point cloud 
-    mergeObjects(local_objects);
+    mergeObjects(local_objects); // Fuse newly found objects into existing ones
 
 }
 
@@ -94,15 +88,12 @@ void ObjectFinder::createObjects(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, std
 
     pcl::ConditionalEuclideanClustering<pcl::PointXYZI> cec (true);
     cec.setInputCloud (cloud);
-    // using namespace std::placeholders;
-
     cec.setConditionFunction (enforceIntensitySimilarity);
     cec.setClusterTolerance (0.15);
     cec.setMinClusterSize (5);
     cec.setMaxClusterSize (100);
     cec.segment (cluster_indices);
 
-    // ROS_INFO("num obj: %d", cluster_indices.size());
     int i = 0;
     for (const auto& cluster_index : cluster_indices) {
         pcl::PointCloud<pcl::PointXYZI>::Ptr cluster_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -128,7 +119,6 @@ void ObjectFinder::mergeObjects(std::list<Object> new_objects){
         for (auto& obj_o: global_objects){
             if (areObjectsSimilar(obj_n, obj_o, _local_iou_thresh)){
                 obj_o.merge(obj_n);// 
-                // std::cout<<"rg"<<std::endl;
                 merged = true;
                 break;
                 

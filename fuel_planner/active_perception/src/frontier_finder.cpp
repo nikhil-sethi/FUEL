@@ -335,12 +335,12 @@ bool FrontierFinder::isInBoxes(
 }
 
 void FrontierFinder::updateFrontierCostMatrix() {
-  std::cout << "cost mat size before remove: " << std::endl;
-  for (auto ftr : frontiers_)
-    std::cout << "(" << ftr.costs_.size() << "," << ftr.paths_.size() << "), ";
-  std::cout << "" << std::endl;
+  // std::cout << "cost mat size before remove: " << std::endl;
+  // for (auto ftr : frontiers_)
+  //   std::cout << "(" << ftr.costs_.size() << "," << ftr.paths_.size() << "), ";
+  // std::cout << "" << std::endl;
 
-  std::cout << "cost mat size remove: " << std::endl;
+  // std::cout << "cost mat size remove: " << std::endl;
   if (!removed_ids_.empty()) {
     // Delete path and cost for removed clusters
     for (auto it = frontiers_.begin(); it != first_new_ftr_; ++it) {
@@ -357,14 +357,14 @@ void FrontierFinder::updateFrontierCostMatrix() {
         cost_iter = it->costs_.erase(cost_iter);
         path_iter = it->paths_.erase(path_iter);
       }
-      std::cout << "(" << it->costs_.size() << "," << it->paths_.size() << "), ";
+      // std::cout << "(" << it->costs_.size() << "," << it->paths_.size() << "), ";
     }
     removed_ids_.clear();
   }
-  std::cout << "" << std::endl;
+  // std::cout << "" << std::endl;
 
   auto updateCost = [](const list<Frontier>::iterator& it1, const list<Frontier>::iterator& it2) {
-    std::cout << "(" << it1->id_ << "," << it2->id_ << "), ";
+    // std::cout << "(" << it1->id_ << "," << it2->id_ << "), ";
     // Search path from old cluster's top viewpoint to new cluster'
     Viewpoint& vui = it1->viewpoints_.front();
     Viewpoint& vuj = it2->viewpoints_.front();
@@ -379,7 +379,7 @@ void FrontierFinder::updateFrontierCostMatrix() {
     it2->paths_.push_back(path_ij);
   };
 
-  std::cout << "cost mat add: " << std::endl;
+  // std::cout << "cost mat add: " << std::endl;
   // Compute path and cost between old and new clusters
   for (auto it1 = frontiers_.begin(); it1 != first_new_ftr_; ++it1)
     for (auto it2 = first_new_ftr_; it2 != frontiers_.end(); ++it2)
@@ -389,17 +389,17 @@ void FrontierFinder::updateFrontierCostMatrix() {
   for (auto it1 = first_new_ftr_; it1 != frontiers_.end(); ++it1)
     for (auto it2 = it1; it2 != frontiers_.end(); ++it2) {
       if (it1 == it2) {
-        std::cout << "(" << it1->id_ << "," << it2->id_ << "), ";
+        // std::cout << "(" << it1->id_ << "," << it2->id_ << "), ";
         it1->costs_.push_back(0);
         it1->paths_.push_back({});
       } else
         updateCost(it1, it2);
     }
-  std::cout << "" << std::endl;
-  std::cout << "cost mat size final: " << std::endl;
-  for (auto ftr : frontiers_)
-    std::cout << "(" << ftr.costs_.size() << "," << ftr.paths_.size() << "), ";
-  std::cout << "" << std::endl;
+  // std::cout << "" << std::endl;
+  // std::cout << "cost mat size final: " << std::endl;
+  // for (auto ftr : frontiers_)
+  //   std::cout << "(" << ftr.costs_.size() << "," << ftr.paths_.size() << "), ";
+  // std::cout << "" << std::endl;
 }
 
 void FrontierFinder::mergeFrontiers(Frontier& ftr1, const Frontier& ftr2) {
@@ -645,7 +645,7 @@ void FrontierFinder::getFullCostMatrix(
 void FrontierFinder::findViewpoints(
     const Vector3d& sample, const Vector3d& ftr_avg, vector<Viewpoint>& vps) {
   if (!edt_env_->sdf_map_->isInBox(sample) ||
-      edt_env_->sdf_map_->getInflateOccupancy(sample) == 1 || isNearUnknown(sample))
+      edt_env_->sdf_map_->getInflateOccupancy(sample) == 1 || edt_env_->sdf_map_->isNearUnknown(sample, min_candidate_clearance_))
     return;
 
   double left_angle_, right_angle_, vertical_angle_, ray_length_;
@@ -719,7 +719,7 @@ void FrontierFinder::sampleViewpoints(Frontier& frontier) {
 
       // Qualified viewpoint is in bounding box and in safe region
       if (!edt_env_->sdf_map_->isInBox(sample_pos) ||
-          edt_env_->sdf_map_->getInflateOccupancy(sample_pos) == 1 || isNearUnknown(sample_pos))
+          edt_env_->sdf_map_->getInflateOccupancy(sample_pos) == 1 || edt_env_->sdf_map_->isNearUnknown(sample_pos, min_candidate_clearance_))
         continue;
 
       // Compute average yaw
@@ -769,17 +769,17 @@ bool FrontierFinder::isFrontierCovered() {
   return false;
 }
 
-bool FrontierFinder::isNearUnknown(const Eigen::Vector3d& pos) {
-  const int vox_num = floor(min_candidate_clearance_ / resolution_);
-  for (int x = -vox_num; x <= vox_num; ++x)
-    for (int y = -vox_num; y <= vox_num; ++y)
-      for (int z = -1; z <= 1; ++z) {
-        Eigen::Vector3d vox;
-        vox << pos[0] + x * resolution_, pos[1] + y * resolution_, pos[2] + z * resolution_;
-        if (edt_env_->sdf_map_->getOccupancy(vox) == SDFMap::UNKNOWN) return true;
-      }
-  return false;
-}
+// bool FrontierFinder::isNearUnknown(const Eigen::Vector3d& pos) {
+//   const int vox_num = floor(min_candidate_clearance_ / resolution_);
+//   for (int x = -vox_num; x <= vox_num; ++x)
+//     for (int y = -vox_num; y <= vox_num; ++y)
+//       for (int z = -1; z <= 1; ++z) {
+//         Eigen::Vector3d vox;
+//         vox << pos[0] + x * resolution_, pos[1] + y * resolution_, pos[2] + z * resolution_;
+//         if (edt_env_->sdf_map_->getOccupancy(vox) == SDFMap::UNKNOWN) return true;
+//       }
+//   return false;
+// }
 
 int FrontierFinder::countVisibleCells(
     const Eigen::Vector3d& pos, const double& yaw, const vector<Eigen::Vector3d>& cluster) {

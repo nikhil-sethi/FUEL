@@ -1,14 +1,26 @@
 #ifndef TGT_PLNR_H
 #define TGT_PLNR_H
 
+#include <ros/ros.h>
 #include <eigen3/Eigen/Eigen>
 #include <tf/transform_datatypes.h>
 #include <active_perception/frontier_finder.h>
+#include <active_perception/object_finder.h>
+#include <active_perception/diffuser.h>
 #include <common/utils.h>
+#include <common_msgs/Viewpoints.h>
+#include <sensor_model/camera.h>
+#include <plan_env/raycast.h>
+#include <active_perception/perception_utils.h>
+
+class Object;
 
 struct TargetViewpoint: fast_planner::Viewpoint{
     float gain_;
-
+    
+    TargetViewpoint(){}
+    ~TargetViewpoint(){}
+    
     TargetViewpoint(Eigen::Vector3d pos, double yaw, float gain=0){
         pos_ = pos;
         yaw_ = yaw;
@@ -58,14 +70,44 @@ struct TargetViewpoint: fast_planner::Viewpoint{
 
 class TargetPlanner{
     public:
+        // TargetPlanner(ros::NodeHandle& nh);
+        TargetPlanner(){}
+        ~TargetPlanner(){}
         void setObjectFinder(std::shared_ptr<ObjectFinder> obj_fnd_ptr){_obj_fnd = obj_fnd_ptr;}
-        void setDiffusionMap(std::shared_ptr<Diffuser> diff_map_ptr){_diff_map = diff_map_ptr;}   
+        void setDiffusionMap(std::shared_ptr<Diffuser> diff_map_ptr){_diff_map = diff_map_ptr;} 
+        void setSDFMap(std::shared_ptr<fast_planner::SDFMap> sdf_map_ptr){_sdf_map = sdf_map_ptr;}
+        void init(ros::NodeHandle& nh);
+
+        std::list<std::vector<TargetViewpoint>> all_viewpoints;
 
     private:
+        void informationGainTimer(const ros::TimerEvent& event);
+        void sampleViewpoints(Object& object, std::vector<TargetViewpoint>& sampled_vpts);
+        void findTopViewpoints(Object& object, std::vector<TargetViewpoint>& sampled_vpts);
+        float computeInformationGain(Object& object, const Eigen::Vector3d& sample_pos, const double& yaw);
+        bool isObjectInView(const Object& object, const Eigen::Vector3d& pos, const Eigen::Vector3d& orient);
+        void sortViewpoints(std::vector<TargetViewpoint>& vpts);
+        float infoTransfer(float gain);
+        void filterSimilarPoses(std::list<std::vector<TargetViewpoint>>& myList);
+        void publishTargetViewpoints();
+
+        // References
+        std::shared_ptr<ObjectFinder> _obj_fnd;
+        std::shared_ptr<Diffuser> _diff_map;
+        std::shared_ptr<fast_planner::SDFMap> _sdf_map;
+        // fast_planner::PlanningVisualization viz;
+
+        // Member variables
+        std::unique_ptr<Camera> _camera;
+        std::unique_ptr<RayCaster> _raycaster;
+        std::unique_ptr<fast_planner::PerceptionUtils> _percep_utils;
         
-
-
-}
+        ros::Publisher vpt_pub;
+        ros::Timer info_timer;
+        common_msgs::Viewpoints vpts_msg;
+        float _rmin, _min_vpt_clearance, _att_min;    
+        Eigen::MatrixXd colormap;
+};
 
 
 #endif

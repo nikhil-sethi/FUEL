@@ -11,6 +11,9 @@
 #include <active_perception/target_planner.h>
 #include <pcl/point_cloud.h>
 #include <pcl/common/common.h>
+#include <common/utils.h>
+
+class TargetViewpoint;
 
 struct Object{
     int id;
@@ -20,7 +23,7 @@ struct Object{
     Eigen::Vector3d bbox_max_;
     Eigen::Vector3d centroid_;
     Eigen::Vector3d scale_;
-    vector<TargetViewpoint> viewpoint_candidates;
+    std::vector<TargetViewpoint> viewpoints;
     std::vector<Eigen::Vector3d> projection_corners;
 
     // initialise projection corners to fixed length
@@ -82,7 +85,7 @@ class ObjectFinder{
 
     private:
         // Member functions
-        void objectUpdateTimer(const ros::TimerEvent& e);
+        void objectFusionTimer(const ros::TimerEvent& e);
         void createObjects(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, std::list<Object>& objects);
         void mergeObjects(std::list<Object> new_objects);
         bool areObjectsSimilar(const Object& obj_a, const Object& obj_b, double overlapThreshold);
