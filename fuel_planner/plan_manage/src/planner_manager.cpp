@@ -37,13 +37,13 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
   nh.param("manager/relax_time1", pp_.relax_time1_, 0.3);
   nh.param("manager/relax_time2", pp_.relax_time2_, 1.5);
 
-  bool use_geometric_path, use_kinodynamic_path, use_topo_path, use_optimization,
-      use_active_perception;
+  bool use_geometric_path, use_kinodynamic_path, use_topo_path, use_optimization;
+  
   nh.param("manager/use_geometric_path", use_geometric_path, false);
   nh.param("manager/use_kinodynamic_path", use_kinodynamic_path, false);
   nh.param("manager/use_topo_path", use_topo_path, false);
   nh.param("manager/use_optimization", use_optimization, false);
-  nh.param("manager/use_active_perception", use_active_perception, false);
+  // nh.param("manager/use_active_perception", use_active_perception, false);
 
   local_data_.traj_id_ = 0;
 
@@ -94,15 +94,15 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
     topo_prm_->setEnvironment(edt_environment_);
     topo_prm_->init(nh);
   }
-
-  if (use_active_perception) {
+  plan_data_.view_cons_.idx_ = -1;
+  // if (use_active_perception) {
     // frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
     // heading_planner_.reset(new HeadingPlanner(nh));
     // heading_planner_->setMap(sdf_map_);
-    visib_util_.reset(new VisibilityUtil(nh));
-    visib_util_->setEDTEnvironment(edt_environment_);
-    plan_data_.view_cons_.idx_ = -1;
-  }
+    // visib_util_.reset(new VisibilityUtil(nh));
+    // visib_util_->setEDTEnvironment(edt_environment_);
+
+  // }
 
   bool use_diffusion = true;
   if (use_diffusion){

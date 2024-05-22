@@ -122,6 +122,7 @@ private:
   Frontier next_frontier_;
 
   // Params
+  bool use_active_perception_;
   int cluster_min_;
   double cluster_size_xy_, cluster_size_z_;
   double candidate_rmax_, candidate_rmin_, candidate_dphi_, min_candidate_dist_,

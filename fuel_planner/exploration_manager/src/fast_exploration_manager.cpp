@@ -77,7 +77,8 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   nh.param("exploration/ydd", ViewNode::ydd_, -1.0);
   nh.param("exploration/w_dir", ViewNode::w_dir_, -1.0);
 
-  nh.param("/is_target_search", is_target_search_, false);
+  nh.param("/use_active_perception", use_active_perception_, false);
+  nh.param("/use_semantic_search", use_semantic_search_, false);
 
   ViewNode::astar_.reset(new Astar);
   ViewNode::astar_->init(nh, edt_environment_);
@@ -171,7 +172,7 @@ int FastExplorationManager::planExploreMotion(
       double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
       next_yaw = std::atan2(siny_cosp, cosy_cosp);    
   }
-  else if (is_target_search_ && !target_vpts.empty()){
+  else if (use_active_perception_ && !target_vpts.empty()){
     int num_targets_vpts = target_vpts.size();
     // greedy TODO change this to viewpoint cost to account for yaw as well
     // find the closest viewpoint to current position

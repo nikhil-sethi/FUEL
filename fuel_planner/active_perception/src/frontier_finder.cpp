@@ -40,6 +40,7 @@ FrontierFinder::FrontierFinder(const EDTEnvironment::Ptr& edt, ros::NodeHandle& 
   nh.param("frontier/min_visib_num", min_visib_num_, -1);
   nh.param("frontier/min_view_finish_fraction", min_view_finish_fraction_, -1.0);
   nh.param("/gamma", gamma, 0.0f);
+  nh.param("/use_active_perception", use_active_perception_, false);
 
   raycaster_.reset(new RayCaster);
   resolution_ = edt_env_->sdf_map_->getResolution();
@@ -92,6 +93,28 @@ void FrontierFinder::searchFrontiers() {
       resetFlag(iter, dormant_frontiers_);
     else
       ++iter;
+  }
+
+  // std::fill(frontier_flag_.begin(), frontier_flag_.end(), false);
+  // frontiers_.clear();
+  // dormant_frontiers_.clear();
+  if (false ){
+    Eigen::Vector3i min_id_ff, max_id_ff;
+    edt_env_->sdf_map_->posToIndex(update_min, min_id_ff);
+    edt_env_->sdf_map_->posToIndex(update_max, max_id_ff);
+    edt_env_->sdf_map_->boundIndex(max_id_ff);
+    edt_env_->sdf_map_->boundIndex(min_id_ff);
+    
+    // std::cout<<update_min.transpose()<<std::endl;
+    // std::cout<<update_max.transpose()<<std::endl;
+
+    for (int x = min_id_ff(0); x <= max_id_ff(0); ++x)
+      for (int y = min_id_ff(1); y <= max_id_ff(1); ++y)
+        for (int z = min_id_ff(2); z <= max_id_ff(2); ++z) {
+          Eigen::Vector3i cur(x, y, z);
+          if (!(knownfree(cur) && isNeighborUnknown(cur)))
+              frontier_flag_[toadr(cur)] = 0;
+        }
   }
 
   // Search new frontier within box slightly inflated from updated box
@@ -287,8 +310,8 @@ bool FrontierFinder::splitHorizontally(const Frontier& frontier, list<Frontier>&
     }
   }
   Eigen::Vector2d first_pc = vectors.col(max_idx);
-  std::cout << "max idx: " << max_idx << std::endl;
-  std::cout << "mean: " << mean.transpose() << ", first pc: " << first_pc.transpose() << std::endl;
+  // std::cout << "max idx: " << max_idx << std::endl;
+  // std::cout << "mean: " << mean.transpose() << ", first pc: " << first_pc.transpose() << std::endl;
 
   // Split the frontier into two groups along the first PC
   Frontier ftr1, ftr2;

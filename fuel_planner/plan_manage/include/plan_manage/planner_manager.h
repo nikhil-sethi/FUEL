@@ -106,7 +106,7 @@ public:
 private:
   // shared_ptr<FrontierFinder> frontier_finder_;
   unique_ptr<HeadingPlanner> heading_planner_;
-  unique_ptr<VisibilityUtil> visib_util_;
+  // unique_ptr<VisibilityUtil> visib_util_;
 
   // Benchmark method, local exploration
 public:

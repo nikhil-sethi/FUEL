@@ -46,26 +46,10 @@ struct TargetViewpoint: fast_planner::Viewpoint{
         return msg;
     }   
 
-    // common_msgs::Viewpoint toMsg(){
-    //     target_search::Viewpoint msg;
-        
-    //     msg.position.x = pos_(0);
-    //     msg.position.y = pos_(1);
-    //     msg.position.z = pos_(2);
-        
-    //     msg.yaw = yaw_;
-    //     msg.priority = gain_;
-        
-    //     return msg;
-    // }  
-
     bool isClose(const TargetViewpoint& other){
         double dpsi = yaw_-other.yaw_;
         return (pos_-other.pos_).norm() < 0.4 && abs(std::min(dpsi, 2*M_PI-dpsi))<0.4;
     }
-
-    Eigen::Vector4d getColor(float min, float max, Eigen::Matrix<double,4,4> colormap);
-
 };
 
 class TargetPlanner{

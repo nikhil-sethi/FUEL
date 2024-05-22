@@ -167,7 +167,6 @@ float TargetPlanner::computeInformationGain(Object& object, const Eigen::Vector3
     for (int x = bbox_min_idx(0); x <= bbox_max_idx(0); ++x)
         for (int y = bbox_min_idx(1); y <= bbox_max_idx(1); ++y)
             for (int z = _sdf_map->mp_->box_min_(2); z < _sdf_map->mp_->box_max_(2); ++z) {
-
         int adr = _sdf_map->toAddress(x,y,z);
         _sdf_map->indexToPos(Eigen::Vector3i(x,y,z), pos);
 
@@ -176,14 +175,15 @@ float TargetPlanner::computeInformationGain(Object& object, const Eigen::Vector3
         
         _raycaster->input(pos, sample_pos);
         bool visib = true;
-        // _raycaster->nextId(idx); // because we're already on the surface, presumably
+        _raycaster->nextId(idx); // because we're already on the surface, presumably
         // start_idx = idx;
         while (_raycaster->nextId(idx)) {
             int ray_adr = _sdf_map->toAddress(idx);
             if (
-                // _diff_map->diffusion_buffer[ray_adr] > 0 // the ray shouldnt have any other attentive cell in it's path
+                // _ftr_fndr->frontier_flag_[ray_adr] == 1
+                _diff_map->diffusion_buffer[ray_adr] > _att_min // the ray shouldnt have any other attentive cell in it's path
                 // _sdf_map->getInflateOccupancy(idx) == 1   // not using inflation for now becauase most attentive cells will be missed out then
-                _sdf_map->getOccupancy(ray_adr) == fast_planner::SDFMap::OCCUPIED 
+                || _sdf_map->getOccupancy(ray_adr) == fast_planner::SDFMap::OCCUPIED 
                 || _sdf_map->getOccupancy(ray_adr) == fast_planner::SDFMap::UNKNOWN
                 ) {
 

@@ -281,7 +281,7 @@ void FastExplorationFSM::visualize() {
   // Draw global top viewpoints info
   std::vector<Eigen::Vector4d> expl_vpt_colors;
   float min_expl_gain = 10; 
-  float max_expl_gain= 50;  
+  float max_expl_gain= 150;  
   for (auto gain: expl_manager_->expl_priorities){
     Eigen::Vector4d color = getColor(gain, min_expl_gain, max_expl_gain, colormap);
     expl_vpt_colors.push_back(color);
