@@ -74,6 +74,7 @@ class TargetPlanner{
         TargetPlanner(){}
         ~TargetPlanner(){}
         void setObjectFinder(std::shared_ptr<ObjectFinder> obj_fnd_ptr){_obj_fnd = obj_fnd_ptr;}
+        void setFrontierFinder(std::shared_ptr<fast_planner::FrontierFinder> ftr_fndr_ptr){_ftr_fndr = ftr_fndr_ptr;}
         void setDiffusionMap(std::shared_ptr<Diffuser> diff_map_ptr){_diff_map = diff_map_ptr;} 
         void setSDFMap(std::shared_ptr<fast_planner::SDFMap> sdf_map_ptr){_sdf_map = sdf_map_ptr;}
         void init(ros::NodeHandle& nh);
@@ -93,6 +94,7 @@ class TargetPlanner{
 
         // References
         std::shared_ptr<ObjectFinder> _obj_fnd;
+        std::shared_ptr<fast_planner::FrontierFinder> _ftr_fndr;
         std::shared_ptr<Diffuser> _diff_map;
         std::shared_ptr<fast_planner::SDFMap> _sdf_map;
         // fast_planner::PlanningVisualization viz;
@@ -105,7 +107,7 @@ class TargetPlanner{
         ros::Publisher vpt_pub;
         ros::Timer info_timer;
         common_msgs::Viewpoints vpts_msg;
-        float _rmin, _min_vpt_clearance, _att_min;    
+        float _rmin, _min_vpt_clearance, _att_min, _min_info_gain;    
         Eigen::MatrixXd colormap;
 };
 

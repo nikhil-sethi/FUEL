@@ -8,6 +8,7 @@
 #include <plan_env/edt_environment.h>
 #include <active_perception/perception_utils.h>
 #include <active_perception/graph_node.h>
+#include <active_perception/diffuser.h>
 
 // use PCL region growing segmentation
 // #include <pcl/point_types.h>
@@ -38,6 +39,7 @@ FrontierFinder::FrontierFinder(const EDTEnvironment::Ptr& edt, ros::NodeHandle& 
   nh.param("frontier/down_sample", down_sample_, -1);
   nh.param("frontier/min_visib_num", min_visib_num_, -1);
   nh.param("frontier/min_view_finish_fraction", min_view_finish_fraction_, -1.0);
+  nh.param("/gamma", gamma, 0.0f);
 
   raycaster_.reset(new RayCaster);
   resolution_ = edt_env_->sdf_map_->getResolution();
@@ -69,7 +71,7 @@ void FrontierFinder::searchFrontiers() {
     iter = frontiers.erase(iter);
   };
 
-  std::cout << "Before remove: " << frontiers_.size() << std::endl;
+  // std::cout << "Before remove: " << frontiers_.size() << std::endl;
 
   removed_ids_.clear();
   int rmv_idx = 0;
@@ -83,7 +85,7 @@ void FrontierFinder::searchFrontiers() {
       ++iter;
     }
   }
-  std::cout << "After remove: " << frontiers_.size() << std::endl;
+  // std::cout << "After remove: " << frontiers_.size() << std::endl;
   for (auto iter = dormant_frontiers_.begin(); iter != dormant_frontiers_.end();) {
     if (haveOverlap(iter->box_min_, iter->box_max_, update_min, update_max) &&
         isFrontierChanged(*iter))
@@ -118,9 +120,6 @@ void FrontierFinder::searchFrontiers() {
   splitLargeFrontiers(tmp_frontiers_);
 
   ROS_WARN_THROTTLE(5.0, "Frontier t: %lf", (ros::Time::now() - t1).toSec());
-
-  int sum = std::accumulate(frontier_flag_.begin(), frontier_flag_.end(), 0);
-  std::cout<<"ff "<< sum<<std::endl;
 }
 
 // void FrontierFinder::searchObjects(){
@@ -494,9 +493,9 @@ void FrontierFinder::computeFrontiersToVisit() {
     ft.id_ = idx++;
     std::cout << ft.id_ << ", ";
   }
-  std::cout << "\nnew num: " << new_num << ", new dormant: " << new_dormant_num << std::endl;
-  std::cout << "to visit: " << frontiers_.size() << ", dormant: " << dormant_frontiers_.size()
-            << std::endl;
+  // std::cout << "\nnew num: " << new_num << ", new dormant: " << new_dormant_num << std::endl;
+  // std::cout << "to visit: " << frontiers_.size() << ", dormant: " << dormant_frontiers_.size()
+            // << std::endl;
 }
 
 void FrontierFinder::getTopViewpointsInfo(
@@ -583,7 +582,7 @@ void FrontierFinder::getFrontierBoxes(vector<pair<Eigen::Vector3d, Eigen::Vector
 }
 
 void FrontierFinder::getPathForTour(
-    const Vector3d& pos, const vector<int>& frontier_ids, vector<Vector3d>& path) {
+    const Vector3d& pos, const vector<uint8_t>& frontier_ids, vector<Vector3d>& path) {
   // Make an frontier_indexer to access the frontier list easier
   vector<list<Frontier>::iterator> frontier_indexer;
   for (auto it = frontiers_.begin(); it != frontiers_.end(); ++it)
@@ -642,72 +641,72 @@ void FrontierFinder::getFullCostMatrix(
   
 }
 
-void FrontierFinder::findViewpoints(
-    const Vector3d& sample, const Vector3d& ftr_avg, vector<Viewpoint>& vps) {
-  if (!edt_env_->sdf_map_->isInBox(sample) ||
-      edt_env_->sdf_map_->getInflateOccupancy(sample) == 1 || edt_env_->sdf_map_->isNearUnknown(sample, min_candidate_clearance_))
-    return;
+// void FrontierFinder::findViewpoints(
+//     const Vector3d& sample, const Vector3d& ftr_avg, vector<Viewpoint>& vps) {
+//   if (!edt_env_->sdf_map_->isInBox(sample) ||
+//       edt_env_->sdf_map_->getInflateOccupancy(sample) == 1 || edt_env_->sdf_map_->isNearUnknown(sample, min_candidate_clearance_))
+//     return;
 
-  double left_angle_, right_angle_, vertical_angle_, ray_length_;
+//   double left_angle_, right_angle_, vertical_angle_, ray_length_;
 
-  // Central yaw is determined by frontier's average position and sample
-  auto dir = ftr_avg - sample;
-  double hc = atan2(dir[1], dir[0]);
+//   // Central yaw is determined by frontier's average position and sample
+//   auto dir = ftr_avg - sample;
+//   double hc = atan2(dir[1], dir[0]);
 
-  vector<int> slice_gains;
-  // Evaluate info gain of different slices
-  for (double phi_h = -M_PI_2; phi_h <= M_PI_2 + 1e-3; phi_h += M_PI / 18) {
-    // Compute gain of one slice
-    int gain = 0;
-    for (double phi_v = -vertical_angle_; phi_v <= vertical_angle_; phi_v += vertical_angle_ / 3) {
-      // Find endpoint of a ray
-      Vector3d end;
-      end[0] = sample[0] + ray_length_ * cos(phi_v) * cos(hc + phi_h);
-      end[1] = sample[1] + ray_length_ * cos(phi_v) * sin(hc + phi_h);
-      end[2] = sample[2] + ray_length_ * sin(phi_v);
+//   vector<int> slice_gains;
+//   // Evaluate info gain of different slices
+//   for (double phi_h = -M_PI_2; phi_h <= M_PI_2 + 1e-3; phi_h += M_PI / 18) {
+//     // Compute gain of one slice
+//     int gain = 0;
+//     for (double phi_v = -vertical_angle_; phi_v <= vertical_angle_; phi_v += vertical_angle_ / 3) {
+//       // Find endpoint of a ray
+//       Vector3d end;
+//       end[0] = sample[0] + ray_length_ * cos(phi_v) * cos(hc + phi_h);
+//       end[1] = sample[1] + ray_length_ * cos(phi_v) * sin(hc + phi_h);
+//       end[2] = sample[2] + ray_length_ * sin(phi_v);
 
-      // Do raycasting to check info gain
-      Vector3i idx;
-      raycaster_->input(sample, end);
-      while (raycaster_->nextId(idx)) {
-        // Hit obstacle, stop the ray
-        if (edt_env_->sdf_map_->getInflateOccupancy(idx) == 1 || !edt_env_->sdf_map_->isInBox(idx))
-          break;
-        // Count number of unknown cells
-        if (edt_env_->sdf_map_->getOccupancy(idx) == SDFMap::UNKNOWN) ++gain;
-      }
-    }
-    slice_gains.push_back(gain);
-  }
+//       // Do raycasting to check info gain
+//       Vector3i idx;
+//       raycaster_->input(sample, end);
+//       while (raycaster_->nextId(idx)) {
+//         // Hit obstacle, stop the ray
+//         if (edt_env_->sdf_map_->getInflateOccupancy(idx) == 1 || !edt_env_->sdf_map_->isInBox(idx))
+//           break;
+//         // Count number of unknown cells
+//         if (edt_env_->sdf_map_->getOccupancy(idx) == SDFMap::UNKNOWN) ++gain;
+//       }
+//     }
+//     slice_gains.push_back(gain);
+//   }
 
-  // Sum up slices' gain to get different yaw's gain
-  vector<pair<double, int>> yaw_gains;
-  for (int i = 0; i < 6; ++i)  // [-90,-10]-> [10,90], delta_yaw = 20, 6 groups
-  {
-    double yaw = hc - M_PI_2 + M_PI / 9.0 * i + right_angle_;
-    int gain = 0;
-    for (int j = 2 * i; j < 2 * i + 9; ++j)  // 80 degree hFOV, 9 slices
-      gain += slice_gains[j];
-    yaw_gains.push_back(make_pair(yaw, gain));
-  }
+//   // Sum up slices' gain to get different yaw's gain
+//   vector<pair<double, int>> yaw_gains;
+//   for (int i = 0; i < 6; ++i)  // [-90,-10]-> [10,90], delta_yaw = 20, 6 groups
+//   {
+//     double yaw = hc - M_PI_2 + M_PI / 9.0 * i + right_angle_;
+//     int gain = 0;
+//     for (int j = 2 * i; j < 2 * i + 9; ++j)  // 80 degree hFOV, 9 slices
+//       gain += slice_gains[j];
+//     yaw_gains.push_back(make_pair(yaw, gain));
+//   }
 
-  // Get several yaws with highest gain
-  vps.clear();
-  sort(
-      yaw_gains.begin(), yaw_gains.end(),
-      [](const pair<double, int>& p1, const pair<double, int>& p2) {
-        return p1.second > p2.second;
-      });
-  for (int i = 0; i < 3; ++i) {
-    if (yaw_gains[i].second < min_visib_num_) break;
-    Viewpoint vp = { sample, yaw_gains[i].first, yaw_gains[i].second };
-    while (vp.yaw_ < -M_PI)
-      vp.yaw_ += 2 * M_PI;
-    while (vp.yaw_ > M_PI)
-      vp.yaw_ -= 2 * M_PI;
-    vps.push_back(vp);
-  }
-}
+//   // Get several yaws with highest gain
+//   vps.clear();
+//   sort(
+//       yaw_gains.begin(), yaw_gains.end(),
+//       [](const pair<double, int>& p1, const pair<double, int>& p2) {
+//         return p1.second > p2.second;
+//       });
+//   for (int i = 0; i < 3; ++i) {
+//     if (yaw_gains[i].second < min_visib_num_) break;
+//     Viewpoint vp = { sample, yaw_gains[i].first, yaw_gains[i].second };
+//     while (vp.yaw_ < -M_PI)
+//       vp.yaw_ += 2 * M_PI;
+//     while (vp.yaw_ > M_PI)
+//       vp.yaw_ -= 2 * M_PI;
+//     vps.push_back(vp);
+//   }
+// }
 
 // Sample viewpoints around frontier's average position, check coverage to the frontier cells
 void FrontierFinder::sampleViewpoints(Frontier& frontier) {
@@ -736,6 +735,7 @@ void FrontierFinder::sampleViewpoints(Frontier& frontier) {
       wrapYaw(avg_yaw);
       // Compute the fraction of covered and visible cells
       int visib_num = countVisibleCells(sample_pos, avg_yaw, cells);
+      // std::cout<<visib_num<<std::endl;
       if (visib_num > min_visib_num_) {
         Viewpoint vp = { sample_pos, avg_yaw, visib_num };
         frontier.viewpoints_.push_back(vp);
@@ -784,8 +784,9 @@ bool FrontierFinder::isFrontierCovered() {
 int FrontierFinder::countVisibleCells(
     const Eigen::Vector3d& pos, const double& yaw, const vector<Eigen::Vector3d>& cluster) {
   percep_utils_->setPose(pos, yaw);
-  int visib_num = 0;
+  float visib_num = 0;
   Eigen::Vector3i idx;
+  
   for (auto cell : cluster) {
     // Check if frontier cell is inside FOV
     if (!percep_utils_->insideFOV(cell)) continue;
@@ -800,9 +801,17 @@ int FrontierFinder::countVisibleCells(
         break;
       }
     }
-    if (visib) visib_num += 1;
+    Eigen::Vector3i cell_idx;
+    edt_env_->sdf_map_->posToIndex(cell, cell_idx);
+    int cell_adr =  edt_env_->sdf_map_->toAddress(cell_idx);
+    if (visib) {
+      float gain = diffuser_->diffusion_buffer[cell_adr];
+      visib_num += std::exp(gamma*(gain-1));
+      // visib_num += 1;
+      // std::cout<<diffuser_->diffusion_buffer[cell_adr]<<std::endl;
+    }
   }
-  return visib_num;
+  return (int)std::round(visib_num);
 }
 
 void FrontierFinder::downsample(

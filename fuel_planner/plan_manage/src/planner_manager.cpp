@@ -310,7 +310,7 @@ void FastPlannerManager::planExploreTraj(const vector<Eigen::Vector3d>& tour,
   seg_num = max(8, seg_num);
   double dt = duration / double(seg_num);
 
-  std::cout << "duration: " << duration << ", seg_num: " << seg_num << ", dt: " << dt << std::endl;
+  // std::cout << "duration: " << duration << ", seg_num: " << seg_num << ", dt: " << dt << std::endl;
 
   for (double ts = 0.0; ts <= duration + 1e-4; ts += dt)
     points.push_back(init_traj.evaluate(ts, 0));

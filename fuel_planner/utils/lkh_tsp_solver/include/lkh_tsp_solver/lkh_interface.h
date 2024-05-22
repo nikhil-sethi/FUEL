@@ -11,7 +11,7 @@ extern "C" {
 
 namespace lkh_interface{
 int solveTSPLKH(const char* input_file);
-void readTourFromFile(std::vector<int>& indices, const std::string& file_dir);
+void readTourFromFile(std::vector<uint8_t>& indices, const std::string& file_dir);
 void writeCostMatToFile(const Eigen::MatrixXd& cost_mat, const std::string& file_dir);
 }
 #endif

@@ -55,6 +55,7 @@ public:
   shared_ptr<SDFMap> getSDFMapPtr(){return sdf_map_;}
   std::vector<geometry_msgs::Pose> target_vpts;
   std::vector<uint16_t> priorities;
+  std::vector<uint16_t> expl_priorities;
 
 private:
   shared_ptr<EDTEnvironment> edt_environment_;
@@ -70,7 +71,7 @@ private:
 
   // Find optimal tour for coarse viewpoints of all frontiers
   void findGlobalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
-                      vector<int>& indices);
+                      vector<uint8_t>& indices);
 
   // Refine local tour for next few frontiers, using more diverse viewpoints
   void refineLocalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d& cur_yaw,

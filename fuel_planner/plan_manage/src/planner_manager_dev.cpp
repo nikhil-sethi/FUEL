@@ -15,7 +15,7 @@ void FastPlannerManager::planYawActMap(const Eigen::Vector3d& start_yaw) {
   double dt_yaw = local_data_.duration_ / seg_num;  // time of B-spline segment
   const int subsp = 2;                              // subsampling factor to create yaw path
   double dt_path = dt_yaw * subsp;                  // time of yaw path segment
-  std::cout << "duration: " << local_data_.duration_ << ", seg_num: " << seg_num
+  // std::cout << "duration: " << local_data_.duration_ << ", seg_num: " << seg_num
             << ", dt_yaw: " << dt_yaw << ", dt_path: " << dt_path << std::endl;
 
   Eigen::Vector3d start_yaw3d = start_yaw;

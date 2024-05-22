@@ -232,10 +232,10 @@ void BsplineOptimizer::optimize() {
       control_points_(i, j) = best_variable_[dim_ * i + j];
   if (optimize_time_) knot_span_ = best_variable_[variable_num_ - 1];
 
-  if (cost_function_ & MINTIME) {
-    std::cout << "Iter num: " << iter_num_ << ", time: " << (ros::Time::now() - t1).toSec()
-              << ", point num: " << point_num_ << ", comb time: " << comb_time << std::endl;
-  }
+  // if (cost_function_ & MINTIME) {
+  //   std::cout << "Iter num: " << iter_num_ << ", time: " << (ros::Time::now() - t1).toSec()
+  //             << ", point num: " << point_num_ << ", comb time: " << comb_time << std::endl;
+  // }
 
   // Deprecated
   // for (int i = order_; i < control_points_.rows(); ++i)

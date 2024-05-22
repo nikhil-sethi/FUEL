@@ -73,7 +73,7 @@ public:
   void updateFrontierCostMatrix();
   void getFullCostMatrix(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
                          Eigen::MatrixXd& mat);
-  void getPathForTour(const Vector3d& pos, const vector<int>& frontier_ids, vector<Vector3d>& path);
+  void getPathForTour(const Vector3d& pos, const vector<uint8_t>& frontier_ids, vector<Vector3d>& path);
 
   void setNextFrontier(const int& id);
   bool isFrontierCovered();
@@ -83,6 +83,8 @@ public:
   friend class ::Diffuser;
   vector<Eigen::Vector3i> allNeighbors(const Eigen::Vector3i& voxel, int depth=1);
   vector<char> frontier_flag_;
+  void setDiffuser(shared_ptr<Diffuser> diff_ptr){diffuser_ = diff_ptr;}
+  list<Frontier> frontiers_, dormant_frontiers_, tmp_frontiers_;
 
 private:
   void splitLargeFrontiers(list<Frontier>& frontiers);
@@ -115,7 +117,6 @@ private:
 
   // Data
   
-  list<Frontier> frontiers_, dormant_frontiers_, tmp_frontiers_;
   vector<int> removed_ids_;
   list<Frontier>::iterator first_new_ftr_;
   Frontier next_frontier_;
@@ -132,6 +133,9 @@ private:
   // Utils
   shared_ptr<EDTEnvironment> edt_env_;
   unique_ptr<RayCaster> raycaster_;
+  shared_ptr<Diffuser> diffuser_;
+
+  float gamma;
 };
 
 }  // namespace fast_planner

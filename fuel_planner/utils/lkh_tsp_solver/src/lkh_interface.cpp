@@ -135,7 +135,7 @@ int solveTSPLKH(const char* input_file) {
   return EXIT_SUCCESS;
 }
 
-void readTourFromFile(std::vector<int>& indices, const std::string& file_dir){
+void readTourFromFile(std::vector<uint8_t>& indices, const std::string& file_dir){
     // Read optimal tour from the tour section of result file
     std::ifstream res_file(file_dir);
     std::string res;

@@ -51,10 +51,11 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
 
   // view_finder_.reset(new ViewFinder(edt_environment_, nh));
   planner_manager_->diffuser_->setFrontierFinder(frontier_finder_);
+  frontier_finder_->setDiffuser(planner_manager_->diffuser_);
 
   target_planner_.reset(new TargetPlanner);
   target_planner_->setObjectFinder(object_finder);
-  target_planner_->setFrontierFinder(frontier_finder);
+  target_planner_->setFrontierFinder(frontier_finder_);
   target_planner_->setDiffusionMap(planner_manager_->diffuser_);
   target_planner_->setSDFMap(sdf_map_);
   target_planner_->init(nh);
@@ -133,8 +134,8 @@ int FastExplorationManager::planExploreMotion(
   ed_->global_tour_.clear();
   int ts_type = TARGET_SEARCH::TSP;
 
-  std::cout << "start pos: " << pos.transpose() << ", vel: " << vel.transpose()
-            << ", acc: " << acc.transpose() << std::endl;
+  // std::cout << "start pos: " << pos.transpose() << ", vel: " << vel.transpose()
+            // << ", acc: " << acc.transpose() << std::endl;
 
   // ===== FIND FRONTIERS =======
   // Search frontiers and group them into clusters
@@ -245,8 +246,25 @@ int FastExplorationManager::planExploreMotion(
       // Find the global tour passing through all viewpoints
       // Create TSP and solve by LKH
       // Optimal tour is returned as indices of frontier
-      vector<int> indices;
-      findGlobalTour(pos, vel, yaw, indices);
+      vector<uint8_t> indices;
+      // findGlobalTour(pos, vel, yaw, indices);
+
+      // Get cost matrix for current state and clusters
+      Eigen::MatrixXd cost_mat;
+      frontier_finder_->getFullCostMatrix(pos, vel, yaw, cost_mat);
+      
+      expl_priorities.clear();
+      for (Frontier ftr: frontier_finder_->frontiers_){
+        // for (Viewpoint vpt: ftr.viewpoints_) {
+          expl_priorities.push_back((uint16_t)ftr.viewpoints_.front().visib_num_);
+        }
+
+      solveMOTSP(cost_mat, expl_priorities, indices);
+
+      // Get the path of optimal tour from path matrix
+      frontier_finder_->getPathForTour(pos, indices, ed_->global_tour_);
+
+
 
         if (ep_->refine_local_) {
           // Do refinement for the next few viewpoints in the global tour
@@ -402,8 +420,6 @@ int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eig
   }
   ed_->path_next_goal_ = planner_manager_->path_finder_->getPath();
   shortenPath(ed_->path_next_goal_);
-  for (auto& goal: ed_->path_next_goal_)
-    std::cout<<"path point: "<<goal.transpose()<<std::endl;
 
   const double radius_far = 3.0;
   const double radius_close = 1.5;  // don't change this below 1.5 or you'll observe a alot of kinodynamic search failures
@@ -485,17 +501,13 @@ void FastExplorationManager::shortenPath(vector<Vector3d>& path) {
   path = short_tour;
 }
 
-void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, vector<int>& indices) {
+void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, vector<uint8_t>& indices) {
   auto t1 = ros::Time::now();
 
   // Get cost matrix for current state and clusters
   Eigen::MatrixXd cost_mat;
-  // frontier_finder_->updateFrontierCostMatrix();
   frontier_finder_->getFullCostMatrix(cur_pos, cur_vel, cur_yaw, cost_mat);
   const int dimension = cost_mat.rows();
-
-  // insert the target points into the costs here
-  // addTargetstoCostMatrix(cost_mat);
 
   double mat_time = (ros::Time::now() - t1).toSec();
   t1 = ros::Time::now();
@@ -509,8 +521,8 @@ void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vecto
   // Read tour  
   lkh_interface::readTourFromFile(indices, ep_->tsp_dir_+ "/single.txt");
   
-  // Get the path of optimal tour from path matrix
-  frontier_finder_->getPathForTour(cur_pos, indices, ed_->global_tour_);
+  // // Get the path of optimal tour from path matrix
+  // frontier_finder_->getPathForTour(cur_pos, indices, ed_->global_tour_);
 
   double tsp_time = (ros::Time::now() - t1).toSec();
   ROS_WARN("Cost mat: %lf, TSP: %lf", mat_time, tsp_time);

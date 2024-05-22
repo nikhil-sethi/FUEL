@@ -61,7 +61,7 @@ void ObjectFinder::objectFusionTimer(const ros::TimerEvent& e){
                 float priority = _prio_map->priority_buffer[adr];
 
                 if (priority < _att_min || !(_sdf_map->getOccupancy(adr) == fast_planner::SDFMap::OCCUPIED)) {
-                    _prio_map->priority_buffer[adr] = 0; // cleanup
+                    // _prio_map->priority_buffer[adr] = 0; // cleanup
                     continue;
                 }
                 

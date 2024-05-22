@@ -268,8 +268,26 @@ void FastExplorationFSM::visualize() {
   for (int i = ed_ptr->dead_frontiers_.size(); i < 5; ++i)
     visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier", i, 4);
 
+
+    Eigen::Matrix<double, 4, 4> colormap;
+    // // jet colormap
+    colormap <<
+        0 ,0,255,1, // blue
+        0,255,0,1, // green
+        255,255,0,1, //yellow
+        255,0,0,1; // red
+    colormap = colormap/255;
+
   // Draw global top viewpoints info
-  visualization_->drawSpheres(ed_ptr->points_, 0.2, Vector4d(1, 0, 0, 1), "points", 0, 6);
+  std::vector<Eigen::Vector4d> expl_vpt_colors;
+  float min_expl_gain = 10; 
+  float max_expl_gain= 50;  
+  for (auto gain: expl_manager_->expl_priorities){
+    Eigen::Vector4d color = getColor(gain, min_expl_gain, max_expl_gain, colormap);
+    expl_vpt_colors.push_back(color);
+  }
+
+  visualization_->drawSpheres(ed_ptr->points_, 0.2, expl_vpt_colors, "exploration_points", 0, 6);
   visualization_->drawLines(ed_ptr->global_tour_, 0.07, Vector4d(0.1, 0.1, 0.1, 1), "global_tour", 0, 6);
   visualization_->drawLines(ed_ptr->points_, ed_ptr->views_, 0.05, Vector4d(0, 1, 0.5, 1), "view", 0, 6);
   visualization_->drawLines(ed_ptr->points_, ed_ptr->averages_, 0.03, Vector4d(1, 0, 0, 1),
@@ -308,50 +326,28 @@ void FastExplorationFSM::visualize() {
         i++;
     }
 
-    Eigen::Matrix<double, 4, 4> colormap;
-    // // jet colormap
-    colormap <<
-        0 ,0,255,1, // blue
-        0,255,0,1, // green
-        255,255,0,1, //yellow
-        255,0,0,1; // red
-    colormap = colormap/255;
 
     float min_gain = 10; 
-    float max_gain=150;
+    float max_gain= 150;
     // std::vector<Eigen::Vector3d> vpt_positions;
     std::vector<Eigen::Vector4d> vpt_colors;
-    // for (Object& object: expl_manager_->object_finder->global_objects ){
+      std::vector<Eigen::Vector3d> vpt_positions;
+      Eigen::Vector3d pos;
+      int k = 0;
       
-    //   for (uint j = 0; j < std::min((int)object.viewpoints.size(), 3); j++){
-    //       auto vpt = object.viewpoints[j];
-    //       vpt_positions.push_back(vpt.posToEigen());
-    //       vpt_colors.push_back(vpt.getColor(min_gain, max_gain, colormap));
-    //   }
-    // }
-    // visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "top viewpoints", 1, 6);
-
-
-    // int j=0, k=0;
-    // for (auto vpts: expl_manager_->target_vpts){
-    //     j++;
-        std::vector<Eigen::Vector3d> vpt_positions;
-        Eigen::Vector3d pos;
-        int k = 0;
+      for (auto vpt: expl_manager_->target_vpts){
         
-        for (auto vpt: expl_manager_->target_vpts){
+        pos(0) = vpt.position.x;
+        pos(1) = vpt.position.y;
+        pos(2) = vpt.position.z;
+          // vpt_positions.push_back(vpt.posToEigen());
+          vpt_positions.push_back(pos);
           
-          pos(0) = vpt.position.x;
-          pos(1) = vpt.position.y;
-          pos(2) = vpt.position.z;
-            // vpt_positions.push_back(vpt.posToEigen());
-            vpt_positions.push_back(pos);
-            
-            Eigen::Vector4d color = getColor(expl_manager_->priorities[k], min_gain, max_gain, colormap);
-            vpt_colors.push_back(color);
-            k++;
-        }
-        if (!vpt_positions.empty()) visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "points_", 1, 6);
+          Eigen::Vector4d color = getColor(expl_manager_->priorities[k], min_gain, max_gain, colormap);
+          vpt_colors.push_back(color);
+          k++;
+      }
+      if (!vpt_positions.empty()) visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "points_", 1, 6);
 
     // }
 

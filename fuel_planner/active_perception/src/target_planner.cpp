@@ -7,6 +7,7 @@ void TargetPlanner::init(ros::NodeHandle& nh){
     nh.param("/target_planner/rmin", _rmin, 0.3f); 
     nh.param("/target_planner/min_vpt_clearance", _min_vpt_clearance, 0.3f); 
     nh.param("/priority_map/pmin", _att_min, 1.0f); 
+    nh.param("/target_planner/min_info_gain", _min_info_gain, 1.0f); 
 
     // inits
     vpts_msg.viewpoints.header.stamp = ros::Time::now();
@@ -39,21 +40,7 @@ void TargetPlanner::informationGainTimer(const ros::TimerEvent& event){
         sampleViewpoints(object, sample_vpts);
         all_viewpoints.push_back(sample_vpts);
     }
-
-    //     int i=0, j=0;
-    // for (auto vpts: all_viewpoints){
-    //     i++;
-    //     std::vector<Eigen::Vector3d> vpt_positions;
-
-    //     for (auto vpt: vpts){
-    //         vpt_positions.push_back(vpt.posToEigen());
-    //         j++;
-    //     }
-    //         viz.drawSpheres(vpt_positions, 0.1, Eigen::Vector4d(0.5, 0.5, 1, 1), "points_"+std::to_string(i), i, 6);
-    // }
     
-    // print("vpts: ", all_viewpoints.size());
-
     filterSimilarPoses(all_viewpoints);
     
     // Calculate priority of each viewpoint 
@@ -69,7 +56,7 @@ void TargetPlanner::informationGainTimer(const ros::TimerEvent& event){
     publishTargetViewpoints();
 
     std::chrono::duration<double> dt_vpt = std::chrono::high_resolution_clock::now() - start;
-    ROS_WARN("Time vpts: %f", dt_vpt);
+    // ROS_WARN("Time vpts: %f", dt_vpt);
 
 }
 
@@ -144,7 +131,7 @@ void TargetPlanner::findTopViewpoints(Object& object, std::vector<TargetViewpoin
 
     for (auto it=sampled_vpts.begin(); it!=sampled_vpts.end();++it){
             float gain = computeInformationGain(object, it->pos_, it->yaw_);
-            if (gain<=5) continue;
+            if (gain<=_min_info_gain) continue;
             
             it->gain_ = gain;
             object.viewpoints.push_back(*it);
@@ -183,18 +170,20 @@ float TargetPlanner::computeInformationGain(Object& object, const Eigen::Vector3
 
         int adr = _sdf_map->toAddress(x,y,z);
         _sdf_map->indexToPos(Eigen::Vector3i(x,y,z), pos);
-        if (_diff_map->diffusion_buffer[adr] < _att_min  || !_percep_utils->insideFOV(pos)) continue;
+
+        // cell should be a frontier and in view
+        if (_ftr_fndr->frontier_flag_[adr] == 0  || !_percep_utils->insideFOV(pos)) continue;
         
         _raycaster->input(pos, sample_pos);
         bool visib = true;
-        _raycaster->nextId(idx); // because we're already on the surface, presumably
-        start_idx = idx;
+        // _raycaster->nextId(idx); // because we're already on the surface, presumably
+        // start_idx = idx;
         while (_raycaster->nextId(idx)) {
             int ray_adr = _sdf_map->toAddress(idx);
             if (
-                _diff_map->diffusion_buffer[ray_adr] > 0 // the ray shouldnt have any other attentive cell in it's path
-                // _sdf_map->getInflateOccupancy(idx) == 1 ||   // not using inflation for now becauase most attentive cells will be missed out then
-                || _sdf_map->getOccupancy(ray_adr) == fast_planner::SDFMap::OCCUPIED 
+                // _diff_map->diffusion_buffer[ray_adr] > 0 // the ray shouldnt have any other attentive cell in it's path
+                // _sdf_map->getInflateOccupancy(idx) == 1   // not using inflation for now becauase most attentive cells will be missed out then
+                _sdf_map->getOccupancy(ray_adr) == fast_planner::SDFMap::OCCUPIED 
                 || _sdf_map->getOccupancy(ray_adr) == fast_planner::SDFMap::UNKNOWN
                 ) {
 

@@ -1,9 +1,11 @@
 #include <plan_env/attention_map.h>
+
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/filters/passthrough.h>
-#include <sensor_msgs/PointCloud2.h>
+#include <pcl/filters/voxel_grid.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+#include <sensor_msgs/PointCloud2.h>
 
 void AttentionMap::init(ros::NodeHandle& nh){
 
@@ -15,7 +17,7 @@ void AttentionMap::init(ros::NodeHandle& nh){
     global_cloud->header.frame_id = "map";
 
     // ROS Parameters    
-    nh.param("/perception/attention_map/3d/att_min", _att_min, 0.1f); 
+    nh.param("/perception/attention_map/3d/att_min", _att_min, 1.0f); 
     // nh.param("/perception/attention_map/3d/diffusion_factor", _diffusion_factor, 0.9f); 
     nh.param("/perception/attention_map/3d/learning_rate", _learning_rate, 0.5f); 
 
@@ -70,10 +72,10 @@ void AttentionMap::inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& cloud)
         outrem.setKeepOrganized(true);
         outrem.filter (*filtered_cloud);
 
-        // pcl::VoxelGrid<pcl::PointXYZI> sor;
-        // sor.setInputCloud (local_att_cloud_filtered);
-        // sor.setLeafSize (0.1f, 0.1f, 0.1f);
-        // sor.filter (*local_att_cloud_filtered);
+        pcl::VoxelGrid<pcl::PointXYZI> sor;
+        sor.setInputCloud (filtered_cloud);
+        sor.setLeafSize (0.08f, 0.08f, 0.08f);
+        sor.filter (*filtered_cloud);
     }
 
 
