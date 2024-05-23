@@ -69,10 +69,10 @@ private:
   bool CUSTOM_GOAL = false;
   bool use_active_perception_ = false;
   bool use_semantic_search_ = false;
+  bool use_lkh_ = false;
 
   // Find optimal tour for coarse viewpoints of all frontiers
-  void findGlobalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
-                      vector<uint8_t>& indices);
+  void findGlobalTour(const Eigen::MatrixXd& cost_mat, vector<uint8_t>& indices);
 
   // Refine local tour for next few frontiers, using more diverse viewpoints
   void refineLocalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d& cur_yaw,

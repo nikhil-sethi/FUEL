@@ -171,7 +171,8 @@ float TargetPlanner::computeInformationGain(Object& object, const Eigen::Vector3
         _sdf_map->indexToPos(Eigen::Vector3i(x,y,z), pos);
 
         // cell should be a frontier and in view
-        if (_ftr_fndr->frontier_flag_[adr] == 0  || !_percep_utils->insideFOV(pos)) continue;
+        // if (_ftr_fndr->frontier_flag_[adr] == 0  || !_percep_utils->insideFOV(pos)) continue;
+        if (_ftr_fndr->frontier_flag_[adr] == 0  || !isPtInView(pos, sample_pos, yaw)) continue;
         
         _raycaster->input(pos, sample_pos);
         bool visib = true;
@@ -196,6 +197,27 @@ float TargetPlanner::computeInformationGain(Object& object, const Eigen::Vector3
     }
     return total_gain; 
 }
+
+bool TargetPlanner::isPtInView(const Eigen::Vector3d& point_world, const Eigen::Vector3d& pos, double yaw){
+    // World to viewpoint
+    Eigen::Isometry3d T_world_sample; // world with respect to sample
+    T_world_sample.translation() = pos;
+      
+    Eigen::Quaterniond quat;
+    quat = Eigen::AngleAxisd(0, Vector3d::UnitX())
+        * Eigen::AngleAxisd(0, Vector3d::UnitY())
+        * Eigen::AngleAxisd(yaw, Vector3d::UnitZ());
+    
+    T_world_sample.linear() = quat.toRotationMatrix();
+
+    // Viewpoint to _camera
+    Eigen::Isometry3d T_world_cam = T_world_sample*_camera->T_odom_cam; // this transform takes a point in world frame to _camera frame
+    
+    Eigen::Vector3d point_cam = T_world_cam.inverse()*point_world;
+
+    return _camera->isPtInView(point_cam);
+}
+
 
 // returns true if a full 6D viewpoint can completely view set of points
 bool TargetPlanner::isObjectInView(const Object& object, const Eigen::Vector3d& pos, const Eigen::Vector3d& orient){

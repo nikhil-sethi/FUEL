@@ -71,6 +71,8 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
     case WAIT_TRIGGER: {
       // Do nothing but wait for trigger
       ROS_WARN_THROTTLE(1.0, "wait for trigger.");
+      thread vis_thread(&FastExplorationFSM::visualize, this);
+      vis_thread.detach();
       break;
     }
 

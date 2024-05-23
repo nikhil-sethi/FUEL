@@ -98,15 +98,15 @@ void FrontierFinder::searchFrontiers() {
   // std::fill(frontier_flag_.begin(), frontier_flag_.end(), false);
   // frontiers_.clear();
   // dormant_frontiers_.clear();
-  if (false ){
+  if (use_active_perception_){
     Eigen::Vector3i min_id_ff, max_id_ff;
     edt_env_->sdf_map_->posToIndex(update_min, min_id_ff);
     edt_env_->sdf_map_->posToIndex(update_max, max_id_ff);
     edt_env_->sdf_map_->boundIndex(max_id_ff);
     edt_env_->sdf_map_->boundIndex(min_id_ff);
     
-    // std::cout<<update_min.transpose()<<std::endl;
-    // std::cout<<update_max.transpose()<<std::endl;
+    std::cout<<update_min.transpose()<<std::endl;
+    std::cout<<update_max.transpose()<<std::endl;
 
     for (int x = min_id_ff(0); x <= max_id_ff(0); ++x)
       for (int y = min_id_ff(1); y <= max_id_ff(1); ++y)
@@ -971,5 +971,33 @@ inline bool FrontierFinder::knownfree(const Eigen::Vector3i& idx) {
 inline bool FrontierFinder::inmap(const Eigen::Vector3i& idx) {
   return edt_env_->sdf_map_->isInMap(idx);
 }
+
+// void publishFrontierFlags(){
+
+//   pcl::PointXYZ pt;
+//   pcl::PointCloud<pcl::PointXYZ> cloud1;
+//   Eigen::Vector3d pos;
+//   for (uint i;i< frontier_flag_.size();i++){
+//     map_->indexToPos(i,pos)
+//     if (flag==1){
+//       pt.x = pos(0);
+//       pt.y = pos(1);
+//       pt.z = pos(2);
+
+//       cloud1.push_back(pt);
+//     }
+      
+//   }
+
+
+//   cloud1.width = cloud1.points.size();
+//   cloud1.height = 1;
+//   cloud1.is_dense = true;
+//   cloud1.header.frame_id = frame_id_;
+//   sensor_msgs::PointCloud2 cloud_msg;
+//   pcl::toROSMsg(cloud1, cloud_msg);
+//   map_all_pub_.publish(cloud_msg);
+// }
+
 
 }  // namespace fast_planner

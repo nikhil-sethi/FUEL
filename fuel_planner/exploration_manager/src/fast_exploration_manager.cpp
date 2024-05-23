@@ -79,6 +79,7 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
 
   nh.param("/use_active_perception", use_active_perception_, false);
   nh.param("/use_semantic_search", use_semantic_search_, false);
+  nh.param("/use_lkh", use_lkh_, false);
 
   ViewNode::astar_.reset(new Astar);
   ViewNode::astar_->init(nh, edt_environment_);
@@ -196,22 +197,30 @@ int FastExplorationManager::planExploreMotion(
 
     // TSP
     else if (num_targets_vpts>1){
-      
-      // computeExploreTargets();
-
+    
       Eigen::MatrixXd cost_mat;
       getTargetCostMatrix(pos, vel, yaw, cost_mat);
-      
 
       vector<uint8_t> indices;
       // vector<uint16_t> priorities = vector<uint16_t>(num_targets_vpts+1,1);
-      // findTargetTour(cost_mat, indices);
+      if (use_lkh_){
+        findGlobalTour(cost_mat, indices);
+      }
+      else{
+        // make all priorities same if semantic search is off
+        if (!use_semantic_search_){
+          std::fill(priorities.begin(), priorities.end(), 1);
+          // for (auto& p: priorities){
+          //   p = 1;
+          // }
+        }
+
+      solveMOTSP(cost_mat, priorities, indices);     
+      }
       
       // solve the TSP and read the tour as indices
       // solveTSPAndGetTour(cost_mat, "/root/thesis_ws/src/thesis/sw/bringup/resource");
       // readTourFromFile(indices, ep_->tsp_dir_);
-
-      solveMOTSP(cost_mat, priorities, indices);
       
       // Get the path of optimal tour from path matrix
       getPathForTour(pos, indices, ed_->global_tour_);
@@ -247,77 +256,82 @@ int FastExplorationManager::planExploreMotion(
       // Find the global tour passing through all viewpoints
       // Create TSP and solve by LKH
       // Optimal tour is returned as indices of frontier
-      vector<uint8_t> indices;
-      // findGlobalTour(pos, vel, yaw, indices);
+      vector<uint8_t> indices;     
 
       // Get cost matrix for current state and clusters
       Eigen::MatrixXd cost_mat;
       frontier_finder_->getFullCostMatrix(pos, vel, yaw, cost_mat);
       
-      expl_priorities.clear();
-      for (Frontier ftr: frontier_finder_->frontiers_){
-        // for (Viewpoint vpt: ftr.viewpoints_) {
-          expl_priorities.push_back((uint16_t)ftr.viewpoints_.front().visib_num_);
+      // Solve TSP and get tour as indices of frontiers
+      if (use_lkh_){ // Metric LKH
+        findGlobalTour(cost_mat, indices);
+      }
+      else{  // 2-opt-LNS
+        expl_priorities.clear();
+        for (Frontier ftr: frontier_finder_->frontiers_){
+          if (use_semantic_search_) // 2-opt-LNS with priorities
+            expl_priorities.push_back((uint16_t)ftr.viewpoints_.front().visib_num_);
+          else  // 2-opt-LNS without priorities
+            expl_priorities.push_back((uint16_t)1);
         }
-
-      solveMOTSP(cost_mat, expl_priorities, indices);
-
-      // Get the path of optimal tour from path matrix
+        solveMOTSP(cost_mat, expl_priorities, indices);
+      }
+      
+      // Get the Full Astar path of optimal tour
       frontier_finder_->getPathForTour(pos, indices, ed_->global_tour_);
 
 
+      if (ep_->refine_local_) {
+        // Do refinement for the next few viewpoints in the global tour
+        // Idx of the first K frontier in optimal tour
+        t1 = ros::Time::now();
 
-        if (ep_->refine_local_) {
-          // Do refinement for the next few viewpoints in the global tour
-          // Idx of the first K frontier in optimal tour
-          t1 = ros::Time::now();
-
-          ed_->refined_ids_.clear();
-          ed_->unrefined_points_.clear();
-          int knum = min(int(indices.size()), ep_->refined_num_);
-          for (int i = 0; i < knum; ++i) {
-            auto tmp = ed_->points_[indices[i]];
-            ed_->unrefined_points_.push_back(tmp);
-            ed_->refined_ids_.push_back(indices[i]);
-            if ((tmp - pos).norm() > ep_->refined_radius_ && ed_->refined_ids_.size() >= 2) break;
-          }
-
-          // Get top N viewpoints for the next K frontiers
-          ed_->n_points_.clear();
-          vector<vector<double>> n_yaws;
-          frontier_finder_->getViewpointsInfo(
-              pos, ed_->refined_ids_, ep_->top_view_num_, ep_->max_decay_, ed_->n_points_, n_yaws);
-
-          ed_->refined_points_.clear();
-          ed_->refined_views_.clear();
-          vector<double> refined_yaws;
-          refineLocalTour(pos, vel, yaw, ed_->n_points_, n_yaws, ed_->refined_points_, refined_yaws);
-          next_pos = ed_->refined_points_[0];
-          next_yaw = refined_yaws[0];
-
-          // Get marker for view visualization
-          for (int i = 0; i < ed_->refined_points_.size(); ++i) {
-            Vector3d view =
-                ed_->refined_points_[i] + 2.0 * Vector3d(cos(refined_yaws[i]), sin(refined_yaws[i]), 0);
-            ed_->refined_views_.push_back(view);
-          }
-          ed_->refined_views1_.clear();
-          ed_->refined_views2_.clear();
-          for (int i = 0; i < ed_->refined_points_.size(); ++i) {
-            vector<Vector3d> v1, v2;
-            frontier_finder_->percep_utils_->setPose(ed_->refined_points_[i], refined_yaws[i]);
-            frontier_finder_->percep_utils_->getFOV(v1, v2);
-            ed_->refined_views1_.insert(ed_->refined_views1_.end(), v1.begin(), v1.end());
-            ed_->refined_views2_.insert(ed_->refined_views2_.end(), v2.begin(), v2.end());
-          }
-          double local_time = (ros::Time::now() - t1).toSec();
-          ROS_WARN("Local refine time: %lf", local_time);
-
-        } else {
-          // Choose the next viewpoint from global tour
-          next_pos = ed_->points_[indices[0]];
-          next_yaw = ed_->yaws_[indices[0]];
+        ed_->refined_ids_.clear();
+        ed_->unrefined_points_.clear();
+        int knum = min(int(indices.size()), ep_->refined_num_);
+        for (int i = 0; i < knum; ++i) {
+          auto tmp = ed_->points_[indices[i]];
+          ed_->unrefined_points_.push_back(tmp);
+          ed_->refined_ids_.push_back(indices[i]);
+          if ((tmp - pos).norm() > ep_->refined_radius_ && ed_->refined_ids_.size() >= 2) break;
         }
+
+        // Get top N viewpoints for the next K frontiers
+        ed_->n_points_.clear();
+        vector<vector<double>> n_yaws;
+        frontier_finder_->getViewpointsInfo(
+            pos, ed_->refined_ids_, ep_->top_view_num_, ep_->max_decay_, ed_->n_points_, n_yaws);
+
+        ed_->refined_points_.clear();
+        ed_->refined_views_.clear();
+        vector<double> refined_yaws;
+        refineLocalTour(pos, vel, yaw, ed_->n_points_, n_yaws, ed_->refined_points_, refined_yaws);
+        next_pos = ed_->refined_points_[0];
+        next_yaw = refined_yaws[0];
+
+        // Get marker for view visualization
+        for (int i = 0; i < ed_->refined_points_.size(); ++i) {
+          Vector3d view =
+              ed_->refined_points_[i] + 2.0 * Vector3d(cos(refined_yaws[i]), sin(refined_yaws[i]), 0);
+          ed_->refined_views_.push_back(view);
+        }
+        ed_->refined_views1_.clear();
+        ed_->refined_views2_.clear();
+        for (int i = 0; i < ed_->refined_points_.size(); ++i) {
+          vector<Vector3d> v1, v2;
+          frontier_finder_->percep_utils_->setPose(ed_->refined_points_[i], refined_yaws[i]);
+          frontier_finder_->percep_utils_->getFOV(v1, v2);
+          ed_->refined_views1_.insert(ed_->refined_views1_.end(), v1.begin(), v1.end());
+          ed_->refined_views2_.insert(ed_->refined_views2_.end(), v2.begin(), v2.end());
+        }
+        double local_time = (ros::Time::now() - t1).toSec();
+        ROS_WARN("Local refine time: %lf", local_time);
+
+      } else {
+        // Choose the next viewpoint from global tour
+        next_pos = ed_->points_[indices[0]];
+        next_yaw = ed_->yaws_[indices[0]];
+      }
     } else if (ed_->points_.size() == 1) {
       // Only 1 destination, no need to find global tour through TSP
       ed_->global_tour_ = { pos, ed_->points_[0] };
@@ -502,13 +516,13 @@ void FastExplorationManager::shortenPath(vector<Vector3d>& path) {
   path = short_tour;
 }
 
-void FastExplorationManager::findGlobalTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, vector<uint8_t>& indices) {
+void FastExplorationManager::findGlobalTour(const Eigen::MatrixXd& cost_mat, vector<uint8_t>& indices) {
   auto t1 = ros::Time::now();
 
   // Get cost matrix for current state and clusters
-  Eigen::MatrixXd cost_mat;
-  frontier_finder_->getFullCostMatrix(cur_pos, cur_vel, cur_yaw, cost_mat);
-  const int dimension = cost_mat.rows();
+  // Eigen::MatrixXd cost_mat;
+  // frontier_finder_->getFullCostMatrix(cur_pos, cur_vel, cur_yaw, cost_mat);
+  // const int dimension = cost_mat.rows();
 
   double mat_time = (ros::Time::now() - t1).toSec();
   t1 = ros::Time::now();

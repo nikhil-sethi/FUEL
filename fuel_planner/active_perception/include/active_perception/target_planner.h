@@ -75,6 +75,7 @@ class TargetPlanner{
         float infoTransfer(float gain);
         void filterSimilarPoses(std::list<std::vector<TargetViewpoint>>& myList);
         void publishTargetViewpoints();
+        bool isPtInView(const Eigen::Vector3d& point_world, const Eigen::Vector3d& pos, double yaw);
 
         // References
         std::shared_ptr<ObjectFinder> _obj_fnd;
