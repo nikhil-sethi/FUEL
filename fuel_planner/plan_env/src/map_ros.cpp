@@ -84,6 +84,8 @@ void MapROS::init(ros::NodeHandle& nh) {
   // att_sub_ = nh.subscribe("/iris_depth_camera/attention_map/2d", 10, &MapROS::attCallback, this);
   att_sub_.reset(new message_filters::Subscriber<sensor_msgs::CompressedImage>(nh, "/attention_map/2d/compressed", 50));
   
+  gmm_sub=nh.subscribe("/attention_map/local/sampled", 10, &MapROS::gmmCallback, this);
+
   sync_image_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePose>(
       MapROS::SyncPolicyImagePose(100), *depth_sub_, *pose_sub_));
   
@@ -184,7 +186,7 @@ void MapROS::depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
   // generate point cloud, update map
   proessDepthImage();
   map_->inputPointCloud(point_cloud_, proj_points_cnt, camera_pos_);
-  _att_map->inputPointCloud(point_cloud_);
+  // _att_map->inputPointCloud(point_cloud_);
   if (local_updated_) {
     map_->clearAndInflateLocalMap();
     esdf_need_update_ = true;
@@ -595,6 +597,12 @@ void MapROS::attCallback(const sensor_msgs::ImageConstPtr& img) {
   cv_ptr->image.copyTo(*att_image_);
 
   attention_needs_update_ = true;
+}
+
+void MapROS::gmmCallback(const sensor_msgs::PointCloud2ConstPtr& msg){
+  pcl::PointCloud<pcl::PointXYZI> cloud;
+  pcl::fromROSMsg(*msg, cloud);
+  _att_map->inputPointCloud(cloud);
 }
 
 

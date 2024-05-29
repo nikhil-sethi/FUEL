@@ -41,7 +41,9 @@ private:
                          const sensor_msgs::CompressedImageConstPtr& att);
   void cloudPoseCallback(const sensor_msgs::PointCloud2ConstPtr& msg,
                          const geometry_msgs::PoseStampedConstPtr& pose);
-  
+
+  void gmmCallback(const sensor_msgs::PointCloud2ConstPtr& msg);
+
   void metricsTimer(const ros::TimerEvent& /*event*/);
 
   void updateESDFCallback(const ros::TimerEvent& /*event*/);
@@ -68,6 +70,7 @@ private:
   vector<uint8_t> occupancy_buffer_light;
   void occupancyTimer(const ros::TimerEvent& e); // publishing occupancy buffer
   std::fstream entropy_file;
+  ros::Subscriber gmm_sub;
 
   SDFMap* map_;
   std::shared_ptr<AttentionMap> _att_map;

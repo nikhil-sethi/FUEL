@@ -64,6 +64,7 @@ private:
   void odometryCallback(const nav_msgs::OdometryConstPtr& msg);
   void visualize();
   void clearVisMarker();
+  bool use_active_perception;
 
 public:
   FastExplorationFSM(/* args */) {

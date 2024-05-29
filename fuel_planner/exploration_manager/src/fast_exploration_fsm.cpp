@@ -21,6 +21,7 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   nh.param("fsm/thresh_replan2", fp_->replan_thresh2_, -1.0);
   nh.param("fsm/thresh_replan3", fp_->replan_thresh3_, -1.0);
   nh.param("fsm/replan_time", fp_->replan_time_, -1.0);
+  nh.param("/use_active_perception", use_active_perception, false);
 
   /* Initialize main modules */
   expl_manager_.reset(new FastExplorationManager);
@@ -332,7 +333,8 @@ void FastExplorationFSM::visualize() {
   // visualization_->drawLines(ed_ptr->path_next_goal_, 0.05, Vector4d(0, 1, 1, 1), "next_goal", 1, 6);
 
 
-    int i=0;
+  if (use_active_perception){
+     int i=0;
     for (Object& object: expl_manager_->object_finder->global_objects ){
         visualization_->drawBox(object.centroid_, object.scale_, Eigen::Vector4d(0.5, 0, 1, 0.3), "box"+std::to_string(i), i, 7);
         i++;
@@ -361,8 +363,8 @@ void FastExplorationFSM::visualize() {
       }
       if (!vpt_positions.empty()) visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "points_", 1, 6);
 
-    // }
-
+  }
+ 
 }
 
 void FastExplorationFSM::clearVisMarker() {

@@ -43,22 +43,30 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   planner_manager_->initPlanModules(nh);
   edt_environment_ = planner_manager_->edt_environment_;
   sdf_map_ = edt_environment_->sdf_map_;
+
+
   frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
+
+  bool use_active_perception;
+  nh.param("/use_active_perception", use_active_perception, false);
+
+  if (use_active_perception){
+    object_finder.reset(new ObjectFinder(nh));
+    object_finder->setPriorityMap(planner_manager_->att_map);
+    object_finder->setSDFMap(sdf_map_);
+    
+    target_planner_.reset(new TargetPlanner);
+    target_planner_->setObjectFinder(object_finder);
+    target_planner_->setFrontierFinder(frontier_finder_);
+    target_planner_->setDiffusionMap(planner_manager_->diffuser_);
+    target_planner_->setSDFMap(sdf_map_);
+    target_planner_->init(nh);
+  }
   
-  object_finder.reset(new ObjectFinder(nh));
-  object_finder->setPriorityMap(planner_manager_->att_map);
-  object_finder->setSDFMap(sdf_map_);
 
   // view_finder_.reset(new ViewFinder(edt_environment_, nh));
   planner_manager_->diffuser_->setFrontierFinder(frontier_finder_);
   frontier_finder_->setDiffuser(planner_manager_->diffuser_);
-
-  target_planner_.reset(new TargetPlanner);
-  target_planner_->setObjectFinder(object_finder);
-  target_planner_->setFrontierFinder(frontier_finder_);
-  target_planner_->setDiffusionMap(planner_manager_->diffuser_);
-  target_planner_->setSDFMap(sdf_map_);
-  target_planner_->init(nh);
 
   ed_.reset(new ExplorationData);
   ep_.reset(new ExplorationParam);
