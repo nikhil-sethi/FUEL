@@ -51,6 +51,8 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   px4ci_finish_client = nh.serviceClient<std_srvs::Trigger>("/px4_mission_finished_ext_cont");
   disable_interface_client_ = nh.serviceClient<std_srvs::Trigger>("/px4_ext_cont_disable");
 
+  tries = 0;
+
 }
 
 void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
@@ -71,51 +73,54 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
     case WAIT_TRIGGER: {
       // Do nothing but wait for trigger
       ROS_WARN_THROTTLE(1.0, "wait for trigger.");
-      thread vis_thread(&FastExplorationFSM::visualize, this);
-      vis_thread.detach();
+      // thread vis_thread(&FastExplorationFSM::visualize, this);
+      // vis_thread.detach();
       break;
     }
 
     case FINISH: {
-      ROS_INFO_THROTTLE(1.0, "finish exploration.");
 
-      // calculate metrics for attention map
-      std_srvs::Trigger srv1;
-      // Send the request to trigger the service
-      bool res1 = metrics_client_.call(srv1);
-      if (res1) {
-          ROS_INFO("Metrics service triggered successfully");
-          // Handle the response if needed
-      } else {
-          ROS_ERROR("Failed to call metrics service");
-      }
+        ROS_INFO_THROTTLE(1.0, "finish exploration.");
 
-      // disable interface control loop
-      std_srvs::Trigger srv2;
-      bool res2 = px4ci_finish_client.call(srv2);
-      if (res2) {
-          ROS_INFO("Mission finish service triggered successfully");
-          // Handle the response if needed
-      } else {
-          ROS_ERROR("Failed to call px4ci_finish service");
-      }
+        // calculate metrics for attention map
+        std_srvs::Trigger srv1;
+        // Send the request to trigger the service
+        bool res1 = metrics_client_.call(srv1);
+        if (res1) {
+            ROS_INFO("Metrics service triggered successfully");
+            // Handle the response if needed
+        } else {
+            ROS_ERROR("Failed to call metrics service");
+        }
 
-      // end mission, go to home
-      std_srvs::Trigger srv3;
-      bool res3 = disable_interface_client_.call(srv3);
-      if (res3) {
-          ROS_INFO("Disable control interface successful");
-          // Handle the response if needed
-      } else {
-          ROS_ERROR("Failed to call disable_interfac service");
-      }
-      expl_manager_->getSDFMapPtr()->closeFile();
+        // disable interface control loop
+        std_srvs::Trigger srv2;
+        bool res2 = px4ci_finish_client.call(srv2);
+        if (res2) {
+            ROS_INFO("Mission finish service triggered successfully");
+            // Handle the response if needed
+        } else {
+            ROS_ERROR("Failed to call px4ci_finish service");
+        }
 
-      transitState(WAIT_TRIGGER, "FSM");
+        // end mission, go to home
+        std_srvs::Trigger srv3;
+        bool res3 = disable_interface_client_.call(srv3);
+        if (res3) {
+            ROS_INFO("Disable control interface successful");
+            // Handle the response if needed
+        } else {
+            ROS_ERROR("Failed to call disable_interfac service");
+        }
+        expl_manager_->getSDFMapPtr()->closeFile();
+        transitState(WAIT_TRIGGER, "FSM");
+      
+      
       break;
     }
 
     case PLAN_TRAJ: {
+      // tries = 0;
       if (fd_->static_state_) {
         // Plan from static state (hover)
         fd_->start_pt_ = fd_->odom_pos_;
@@ -142,10 +147,15 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       int res = callExplorationPlanner();
       if (res == SUCCEED) {
         transitState(PUB_TRAJ, "FSM");
+        tries = 0;
       } else if (res == NO_FRONTIER) {
-        transitState(FINISH, "FSM");
-        fd_->static_state_ = true;
-        clearVisMarker();
+        if (tries > 10) {
+          transitState(FINISH, "FSM");
+          fd_->static_state_ = true;
+          clearVisMarker();
+        }
+        tries +=1;
+
       } else if (res == FAIL) {
         // Still in PLAN_TRAJ state, keep replanning
         ROS_WARN("plan fail");

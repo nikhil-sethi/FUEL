@@ -43,6 +43,7 @@ private:
   EXPL_STATE state_;
 
   bool classic_;
+  int tries;
 
   /* ROS utils */
   ros::NodeHandle node_;
