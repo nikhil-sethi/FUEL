@@ -12,12 +12,14 @@ class Diffuser{
         Diffuser(const shared_ptr<fast_planner::EDTEnvironment>& edt, ros::NodeHandle& nh);
         void setFrontierFinder(std::shared_ptr<fast_planner::FrontierFinder>& ff_ptr);
         std::vector<float> diffusion_buffer;
+        void inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& cloud);
 
     private:
         // Member functions
         void diffusionTimer(const ros::TimerEvent& event);
         void publishDiffusionMap();
         float partialConvolution(const Eigen::Vector3i& voxel);
+        void updatePriority(Eigen::Vector3d pos, float new_priority);
 
         // Member variables
         std::shared_ptr<AttentionMap> _att_map;
@@ -29,7 +31,7 @@ class Diffuser{
         ros::Publisher _map_pub;
 
         // float _diffusion_factor;
-        float _att_min;
+        float _att_min, _learning_rate;
         int _kernel_sigma;
         int _kernel_size;
         int _kernel_depth;

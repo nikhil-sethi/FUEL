@@ -9,7 +9,7 @@
 #include <path_searching/topo_prm.h>
 
 #include <plan_env/edt_environment.h>
-#include <plan_env/map_ros.h>
+#include <plan_manage/map_ros.h>
 
 #include <active_perception/frontier_finder.h>
 #include <active_perception/heading_planner.h>

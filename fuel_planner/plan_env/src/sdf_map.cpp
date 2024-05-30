@@ -1,5 +1,7 @@
 #include "plan_env/sdf_map.h"
-#include "plan_env/map_ros.h"
+// #include "plan_manage/map_ros.h"
+#include <pcl/io/pcd_io.h>
+
 #include <plan_env/raycast.h>
 
 namespace fast_planner {
@@ -115,17 +117,17 @@ void SDFMap::loadGTAttMap(){
 
 }
 
-
-void SDFMap::initMap(MapROS* map_ros, ros::NodeHandle& nh) {
+void SDFMap::initMap(ros::NodeHandle& nh) {
   // mp_.reset(new MapParam);
   // md_.reset(new MapData);
   setParams(nh);
-  mr_.reset(map_ros);
+  // mr_.reset(map_ros);
 
   // Initialize ROS wrapper
-  mr_->setMap(this);
+  // mr_->setMap(this);
   // mr_->node_ = nh;
   // mr_->init();
+  local_updated_ = false;
 
   caster_.reset(new RayCaster);
   caster_->setParams(mp_->resolution_, mp_->map_origin_);
@@ -303,7 +305,7 @@ void SDFMap::setCacheOccupancy(const int& adr, const int& occ) {
   //   md_->cache_voxel_.push(adr);
 }
 
-void SDFMap::closeFile(){mr_->entropy_file.close();}
+// void SDFMap::closeFile(){mr_->entropy_file.close();}
 
 void SDFMap::inputPointCloud(
     const pcl::PointCloud<pcl::PointXYZI>& points, const int& point_num,
@@ -370,7 +372,7 @@ void SDFMap::inputPointCloud(
   posToIndex(update_min - bound_inf, md_->local_bound_min_);
   boundIndex(md_->local_bound_min_);
   boundIndex(md_->local_bound_max_);
-  mr_->local_updated_ = true;
+  local_updated_ = true;
 
   // Bounding box for subsequent updating
   for (int k = 0; k < 3; ++k) {

@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   tf
   geometry_msgs
+  common_msgs
 )
 
 
@@ -57,6 +58,7 @@ include_directories(
 
 add_library(plan_manage 
   src/planner_manager.cpp
+  src/map_ros.cpp
   # src/planner_manager_dev.cpp
   )
 target_link_libraries(plan_manage ${catkin_LIBRARIES})

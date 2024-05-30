@@ -22,6 +22,7 @@ using std::normal_distribution;
 using std::default_random_engine;
 
 class AttentionMap;
+class Diffuser;
 
 namespace fast_planner {
 class SDFMap;
@@ -32,6 +33,7 @@ public:
   ~MapROS();
   void setMap(SDFMap* map);
   void setAttentionMap(std::shared_ptr<AttentionMap> att_map);
+  void setDiffusionMap(std::shared_ptr<Diffuser> diff_map);
 
   void init(ros::NodeHandle& nh);
 
@@ -74,6 +76,7 @@ private:
 
   SDFMap* map_;
   std::shared_ptr<AttentionMap> _att_map;
+  std::shared_ptr<Diffuser> _diff_map;
   // may use ExactTime?
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped>
       SyncPolicyImagePose;

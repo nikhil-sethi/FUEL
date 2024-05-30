@@ -113,7 +113,7 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
         } else {
             ROS_ERROR("Failed to call disable_interfac service");
         }
-        expl_manager_->getSDFMapPtr()->closeFile();
+        // expl_manager_->getSDFMapPtr()->closeFile();
         transitState(WAIT_TRIGGER, "FSM");
       
       

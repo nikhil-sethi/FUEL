@@ -1,10 +1,11 @@
 #include <plan_env/sdf_map.h>
-#include <plan_env/map_ros.h>
+#include <plan_manage/map_ros.h>
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <visualization_msgs/Marker.h>
 #include <common_msgs/uint8List.h>
+#include <active_perception/diffuser.h>
 #include <ctime>
 
 #include <fstream>
@@ -22,6 +23,10 @@ void MapROS::setMap(SDFMap* map) {
 
 void MapROS::setAttentionMap(std::shared_ptr<AttentionMap> att_map_ptr) {
   this->_att_map = att_map_ptr;
+}
+
+void MapROS::setDiffusionMap(std::shared_ptr<Diffuser> diff_map_ptr) {
+  this->_diff_map = diff_map_ptr;
 }
 
 void MapROS::init(ros::NodeHandle& nh) {
@@ -49,7 +54,7 @@ void MapROS::init(ros::NodeHandle& nh) {
   // proj_points_.reserve(640 * 480 / map_->mp_->skip_pixel_ / map_->mp_->skip_pixel_);
   proj_points_cnt = 0;
 
-  local_updated_ = false;
+  // local_updated_ = false;
   esdf_need_update_ = false;
   fuse_time_ = 0.0;
   esdf_time_ = 0.0;
@@ -111,7 +116,7 @@ void MapROS::init(ros::NodeHandle& nh) {
   // occ_timer_ = nh.createTimer(ros::Duration(0.05), &MapROS::occupancyTimer, this);
   
   // metrics
-  metrics_timer = nh.createTimer(ros::Duration(1), &MapROS::metricsTimer, this);
+  // metrics_timer = nh.createTimer(ros::Duration(1), &MapROS::metricsTimer, this);
 
   // current date/time based on current system
   time_t now = time(0);
@@ -119,8 +124,8 @@ void MapROS::init(ros::NodeHandle& nh) {
   // convert now to string form
   std::string dt = ctime(&now);
   std::string filename = "/root/entropy_" + dt + ".csv";
-  entropy_file.open(filename,  std::fstream::in | std::fstream::out | std::fstream::app);
-  entropy_file<<"time,entropy \n";
+  // entropy_file.open(filename,  std::fstream::in | std::fstream::out | std::fstream::app);
+  // entropy_file<<"time,entropy \n";
 }
 
 void MapROS::visCallback(const ros::TimerEvent& e) {
@@ -187,10 +192,10 @@ void MapROS::depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
   proessDepthImage();
   map_->inputPointCloud(point_cloud_, proj_points_cnt, camera_pos_);
   // _att_map->inputPointCloud(point_cloud_);
-  if (local_updated_) {
+  if (map_->local_updated_) {
     map_->clearAndInflateLocalMap();
     esdf_need_update_ = true;
-    local_updated_ = false;
+    map_->local_updated_ = false;
   }
 
   auto t2 = ros::Time::now();
@@ -215,10 +220,10 @@ void MapROS::cloudPoseCallback(const sensor_msgs::PointCloud2ConstPtr& msg,
 
   map_->inputPointCloud(cloud, num, camera_pos_);
 
-  if (local_updated_) {
+  if (map_->local_updated_) {
     map_->clearAndInflateLocalMap();
     esdf_need_update_ = true;
-    local_updated_ = false;
+    map_->local_updated_ = false;
   }
 }
 
@@ -602,7 +607,7 @@ void MapROS::attCallback(const sensor_msgs::ImageConstPtr& img) {
 void MapROS::gmmCallback(const sensor_msgs::PointCloud2ConstPtr& msg){
   pcl::PointCloud<pcl::PointXYZI> cloud;
   pcl::fromROSMsg(*msg, cloud);
-  _att_map->inputPointCloud(cloud);
+  _diff_map->inputPointCloud(cloud);
 }
 
 

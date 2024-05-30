@@ -35,7 +35,7 @@ public:
 
   enum OCCUPANCY { UNKNOWN, FREE, OCCUPIED };
 
-  void initMap(MapROS* map_ros, ros::NodeHandle& nh);
+  void initMap(ros::NodeHandle& nh);
   void inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& points, const int& point_num,
                        const Eigen::Vector3d& camera_pos);
 
@@ -76,9 +76,10 @@ public:
   void processAttentionMap();
   void setParams(ros::NodeHandle& nh, std::string ns="");
   void loadGTAttMap();
-  void closeFile();
+  // void closeFile();
   int buffer_size;
-
+  bool local_updated_;
+  
 private:
   void clearAndInflateLocalMap();
   void inflatePoint(const Eigen::Vector3i& pt, int step, vector<Eigen::Vector3i>& pts);
@@ -89,7 +90,7 @@ private:
 
   unique_ptr<MapParam> mp_;
   unique_ptr<MapData> md_;
-  shared_ptr<MapROS> mr_;
+  // shared_ptr<MapROS> mr_;
   unique_ptr<RayCaster> caster_;
 
   friend MapROS;

@@ -47,7 +47,7 @@ add_library( plan_env
     src/obj_predictor.cpp 
     src/edt_environment.cpp 
     src/raycast.cpp
-    src/map_ros.cpp
+    # src/map_ros.cpp
     )
 target_link_libraries( plan_env
     ${catkin_LIBRARIES} 

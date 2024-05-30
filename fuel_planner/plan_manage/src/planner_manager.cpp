@@ -51,7 +51,8 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
   _map_ros->init(nh);
 
   sdf_map_.reset(new SDFMap);
-  sdf_map_->initMap(_map_ros.get(), nh);
+  sdf_map_->initMap(nh);
+  _map_ros->setMap(sdf_map_.get());
 
   edt_environment_.reset(new EDTEnvironment);
   edt_environment_->setMap(sdf_map_);
@@ -61,7 +62,7 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
   att_map->setSDFMap(sdf_map_);
   att_map->init(nh); // needs map to be set first
 
-  _map_ros->setAttentionMap(att_map);
+  // _map_ros->setAttentionMap(att_map);
   edt_environment_->setAttentionMap(att_map);
 
   
@@ -108,6 +109,7 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
   if (use_diffusion){
     diffuser_.reset(new Diffuser(edt_environment_, nh));
     // diffuser_->setFrontierFinder(frontier_finder_);
+    _map_ros->setDiffusionMap(diffuser_);
   }
 
 }

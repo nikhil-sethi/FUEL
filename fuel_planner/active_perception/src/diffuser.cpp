@@ -1,10 +1,16 @@
 #include <active_perception/diffuser.h>
 #include <active_perception/frontier_finder.h>
 #include <common/io.h>
+#include <common/utils.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <chrono>
 #include <cmath>
+
+#include <pcl/filters/radius_outlier_removal.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/filters/voxel_grid.h>
+
 
 typedef std::chrono::time_point<std::chrono::high_resolution_clock> time_point;
 typedef std::chrono::duration<double> time_diff;
@@ -42,7 +48,10 @@ Diffuser::Diffuser(const shared_ptr<fast_planner::EDTEnvironment>& edt, ros::Nod
     // nh.param("/perception/attention_map/3d/diffusion_factor", _diffusion_factor, 0.9f); 
     nh.param("/diffusion/sigma", _kernel_sigma, 2); 
     nh.param("/diffusion/kernel_size", _kernel_size, 3); 
-    _att_min = _att_map->getAttMin();
+    nh.param("/perception/attention_map/3d/att_min", _att_min, 1.0f); 
+    nh.param("/perception/attention_map/3d/learning_rate", _learning_rate, 0.5f); 
+
+    // _att_min = _att_map->getAttMin();
 
     // member variables
     diffusion_buffer = std::vector<float>(_sdf_map->buffer_size, 0);
@@ -87,7 +96,7 @@ float Diffuser::partialConvolution(const Eigen::Vector3i& voxel){
         if (attention < _att_min) 
             continue;
 
-        Eigen::Vector3i idx = (nbr - voxel).cwiseAbs();
+        Eigen::Vector3i idx = (nbr - voxel).cwiseAbs(); // absolute dista
         float weight = _kernel_weights[idx(0)+ _kernel_depth][idx(1)+ _kernel_depth][idx(2)+ _kernel_depth]; 
         att_nbr += weight*attention;
         norm += weight;   // for partial convolution renormalisation
@@ -165,3 +174,69 @@ void Diffuser::publishDiffusionMap(){
     _map_pub.publish(cloud_msg);
 
 }   
+
+void Diffuser::updatePriority(Eigen::Vector3d pos, float new_priority){
+    Eigen::Vector3i idx;
+    _sdf_map->posToIndex(pos, idx);
+    int vox_adr = _sdf_map->toAddress(idx);
+
+    // only update occupied cells
+    if (_ff->frontier_flag_[vox_adr]==0) // only update frontier voxels 
+        return; 
+
+    // perform weighted update
+    std::cout<<"dfgs"<<std::endl;
+    // diffusion_buffer[vox_adr] = _learning_rate*new_priority + (1-_learning_rate)*diffusion_buffer[vox_adr];
+    diffusion_buffer[vox_adr] = new_priority;
+}
+
+/* Update the priority buffer using the depth intensity point cloud*/
+void Diffuser::inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& cloud){
+    // ===== Cleanup ====
+    
+    pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+    *filtered_cloud = cloud;
+    // ===== Intensity pass through
+    pcl::PassThrough<pcl::PointXYZI> pass;
+    pass.setInputCloud(filtered_cloud);
+    pass.setFilterFieldName("intensity");
+    pass.setFilterLimits(_att_min, 10.0); 
+    pass.filter(*filtered_cloud);
+
+    if (filtered_cloud->size()>0){
+        // ====== Density filtering =======
+        pcl::RadiusOutlierRemoval<pcl::PointXYZI> outrem;
+
+        outrem.setInputCloud(filtered_cloud);
+        outrem.setRadiusSearch(0.2);
+        outrem.setMinNeighborsInRadius (3);
+        outrem.setKeepOrganized(true);
+        outrem.filter (*filtered_cloud);
+
+        pcl::VoxelGrid<pcl::PointXYZI> sor;
+        sor.setInputCloud (filtered_cloud);
+        sor.setLeafSize (0.08f, 0.08f, 0.08f);
+        sor.filter (*filtered_cloud);
+    }
+
+
+    // ======= Global buffer update ======
+
+    // update the global buffer. Very small loop
+    Eigen::Vector3d pos;
+    Eigen::Vector3d max, min;
+    _sdf_map->indexToPos(_sdf_map->md_->local_bound_min_, min);
+    _sdf_map->indexToPos(_sdf_map->md_->local_bound_max_, max);
+    
+    for (auto& pt: filtered_cloud->points){
+        
+        // pos[0] = pt.x;
+        // pos[1] = pt.y;
+        // pos[2] = pt.z;
+        pos = Eigen::Vector3d(pt.x, pt.y, pt.z);
+        if (!isPtInBox(pos, min, max))
+            continue;
+        updatePriority(pos, pt.intensity);
+    }
+
+}
