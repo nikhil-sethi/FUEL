@@ -57,7 +57,8 @@ public:
   FrontierFinder(const shared_ptr<EDTEnvironment>& edt, ros::NodeHandle& nh);
   ~FrontierFinder();
 
-  void searchFrontiers();
+  void removeOldFrontiers();
+  void searchNewFrontiers();
   void computeFrontiersToVisit();
 
   void getFrontiers(vector<vector<Vector3d>>& clusters);

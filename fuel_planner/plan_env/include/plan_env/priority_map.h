@@ -9,10 +9,10 @@
 #include <eigen3/Eigen/Eigen>
 
 
-class AttentionMap{
+class PriorityMap{
     public:
-        AttentionMap(){};
-        ~AttentionMap(){};
+        PriorityMap(){};
+        ~PriorityMap(){};
         
         void init(ros::NodeHandle& nh);
         void setSDFMap(std::shared_ptr<fast_planner::SDFMap> sdf_map_ptr);

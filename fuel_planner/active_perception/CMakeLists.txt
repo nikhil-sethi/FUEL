@@ -27,7 +27,7 @@ common_msgs
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES active_perception
- CATKIN_DEPENDS plan_env bspline path_searching
+ CATKIN_DEPENDS plan_env bspline path_searching common
  DEPENDS system_lib
 )
 

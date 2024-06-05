@@ -31,7 +31,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES plan_manage
- CATKIN_DEPENDS plan_env path_searching bspline bspline_opt active_perception traj_utils attention_map)
+ CATKIN_DEPENDS plan_env path_searching bspline bspline_opt active_perception traj_utils)
 
 include_directories(
   include

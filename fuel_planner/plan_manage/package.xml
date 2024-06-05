@@ -59,7 +59,6 @@
   <build_depend>bspline_opt</build_depend>
   <build_depend>active_perception</build_depend>
   <build_depend>traj_utils</build_depend>
-  <build_depend>attention_map</build_depend>
 
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>std_msgs</build_export_depend>
@@ -74,7 +73,6 @@
   <exec_depend>bspline_opt</exec_depend>
   <exec_depend>active_perception</exec_depend>
   <exec_depend>traj_utils</exec_depend>
-  <exec_depend>attention_map</exec_depend>
   
 
 

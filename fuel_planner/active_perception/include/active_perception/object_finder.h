@@ -4,7 +4,7 @@
 #include <list>
 #include <vector>
 #include <eigen3/Eigen/Eigen>
-#include <plan_env/attention_map.h>
+#include <plan_env/priority_map.h>
 #include <plan_env/sdf_map.h>
 #include <active_perception/diffuser.h>
 #include <pcl/point_types.h>
@@ -78,7 +78,7 @@ class ObjectFinder{
     public:
         ObjectFinder(ros::NodeHandle& nh);
 
-        void setPriorityMap(std::shared_ptr<AttentionMap> att_map_ptr){_prio_map = att_map_ptr; _att_min = _prio_map->getAttMin();}
+        void setPriorityMap(std::shared_ptr<PriorityMap> att_map_ptr){_prio_map = att_map_ptr; _att_min = _prio_map->getAttMin();}
         void setSDFMap(std::shared_ptr<fast_planner::SDFMap> sdf_map_ptr){_sdf_map = sdf_map_ptr;}
 
         std::list<Object> global_objects;
@@ -92,7 +92,7 @@ class ObjectFinder{
         void publishObjectBoxes();
 
         // References
-        std::shared_ptr<AttentionMap> _prio_map;
+        std::shared_ptr<PriorityMap> _prio_map;
         std::shared_ptr<Diffuser> _diff_map;
         std::shared_ptr<fast_planner::SDFMap> _sdf_map;
         

@@ -4,11 +4,11 @@
 
 namespace fast_planner {
 PerceptionUtils::PerceptionUtils(ros::NodeHandle& nh) {
-  nh.param("/exploration_node/perception_utils/top_angle", top_angle_, -1.0);
-  nh.param("/exploration_node/perception_utils/left_angle", left_angle_, -1.0);
-  nh.param("/exploration_node/perception_utils/right_angle", right_angle_, -1.0);
-  nh.param("/exploration_node/perception_utils/max_dist", max_dist_, -1.0);
-  nh.param("/exploration_node/perception_utils/vis_dist", vis_dist_, -1.0);
+  nh.param("perception_utils/top_angle", top_angle_, -1.0);
+  nh.param("perception_utils/left_angle", left_angle_, -1.0);
+  nh.param("perception_utils/right_angle", right_angle_, -1.0);
+  nh.param("perception_utils/max_dist", max_dist_, -1.0);
+  nh.param("perception_utils/vis_dist", vis_dist_, -1.0);
 
   n_top_ << 0.0, sin(M_PI_2 - top_angle_), cos(M_PI_2 - top_angle_);
   n_bottom_ << 0.0, -sin(M_PI_2 - top_angle_), cos(M_PI_2 - top_angle_);

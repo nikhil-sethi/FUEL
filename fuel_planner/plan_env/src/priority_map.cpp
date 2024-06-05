@@ -1,4 +1,4 @@
-#include <plan_env/attention_map.h>
+#include <plan_env/priority_map.h>
 
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/filters/passthrough.h>
@@ -7,7 +7,7 @@
 
 #include <sensor_msgs/PointCloud2.h>
 
-void AttentionMap::init(ros::NodeHandle& nh){
+void PriorityMap::init(ros::NodeHandle& nh){
 
     // Initialise variables
     priority_buffer = std::vector<float>(_map->buffer_size, 0);
@@ -17,16 +17,16 @@ void AttentionMap::init(ros::NodeHandle& nh){
     global_cloud->header.frame_id = "map";
 
     // ROS Parameters    
-    nh.param("/perception/attention_map/3d/att_min", _att_min, 1.0f); 
-    // nh.param("/perception/attention_map/3d/diffusion_factor", _diffusion_factor, 0.9f); 
-    nh.param("/perception/attention_map/3d/learning_rate", _learning_rate, 0.5f); 
+    nh.param("/priority_map/pmin", _att_min, 1.0f); 
+    // nh.param("/perception/priority_map/3d/diffusion_factor", _diffusion_factor, 0.9f); 
+    nh.param("/priority_map/learning_rate", _learning_rate, 0.5f); 
 
     // ROS pub, sub, timers    
-    _map_pub = nh.advertise<sensor_msgs::PointCloud2>("/attention_map/global", 1);
-    _pub_map_timer = nh.createTimer(ros::Duration(0.1), &AttentionMap::publishMapTimer, this);
+    _map_pub = nh.advertise<sensor_msgs::PointCloud2>("/priority_map/global", 1);
+    _pub_map_timer = nh.createTimer(ros::Duration(0.1), &PriorityMap::publishMapTimer, this);
 }
 
-void AttentionMap::setSDFMap(std::shared_ptr<fast_planner::SDFMap> sdf_map_ptr){
+void PriorityMap::setSDFMap(std::shared_ptr<fast_planner::SDFMap> sdf_map_ptr){
     _map = sdf_map_ptr;
 }
 
@@ -34,7 +34,7 @@ void AttentionMap::setSDFMap(std::shared_ptr<fast_planner::SDFMap> sdf_map_ptr){
 Currently just weighted update. 
 Can be log odds as well in the future
 */
-void AttentionMap::updatePriority(Eigen::Vector3d pos, float new_priority){
+void PriorityMap::updatePriority(Eigen::Vector3d pos, float new_priority){
     Eigen::Vector3i idx;
     _map->posToIndex(pos, idx);
     if (!_map->isInMap(idx)) 
@@ -50,7 +50,7 @@ void AttentionMap::updatePriority(Eigen::Vector3d pos, float new_priority){
 }
 
 /* Update the priority buffer using the depth intensity point cloud*/
-void AttentionMap::inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& cloud){
+void PriorityMap::inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& cloud){
     // ===== Cleanup ====
     
     pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZI>);
@@ -97,7 +97,7 @@ void AttentionMap::inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& cloud)
 
 }
 
-void AttentionMap::publishMapTimer(const ros::TimerEvent& event){
+void PriorityMap::publishMapTimer(const ros::TimerEvent& event){
 
     global_cloud->points.clear();
     pcl::PointXYZI pcl_pt;

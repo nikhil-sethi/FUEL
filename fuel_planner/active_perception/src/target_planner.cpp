@@ -2,6 +2,14 @@
 #include <chrono>
 #include <common/io.h>
 
+void wrapYaw(double& yaw) {
+  while (yaw < -M_PI)
+    yaw += 2 * M_PI;
+  while (yaw > M_PI)
+    yaw -= 2 * M_PI;
+}
+
+
 void TargetPlanner::init(ros::NodeHandle& nh){    
     // Params
     nh.param("/target_planner/rmin", _rmin, 0.3f); 
@@ -100,7 +108,7 @@ void TargetPlanner::sampleViewpoints(Object& object, std::vector<TargetViewpoint
             Eigen::Vector3d sample_pos = object.centroid_ + rc * Eigen::Vector3d(cos(phi), sin(phi), 0);
             sample_pos[2] = sample_pos[2] + 0.1; // add a height to view the object isometrically. this will depend on the data from the sensor model
 
-            if (!_sdf_map->isInBox(sample_pos) || _sdf_map->getInflateOccupancy(sample_pos) == 1 || _sdf_map->isNearUnknown(sample_pos, _min_vpt_clearance))
+            if (!_sdf_map->isInBox(sample_pos) || _sdf_map->getInflateOccupancy(sample_pos) == 1 || _sdf_map->isNearUnknown(sample_pos, _min_vpt_clearance) || sample_pos(2)<0.3)
                 continue;
 
             // === Check if object is in view            
@@ -132,7 +140,7 @@ void TargetPlanner::findTopViewpoints(Object& object, std::vector<TargetViewpoin
     for (auto it=sampled_vpts.begin(); it!=sampled_vpts.end();++it){
             float gain = computeInformationGain(object, it->pos_, it->yaw_);
             if (gain<=_min_info_gain) continue;
-            
+            // print(gain);
             it->gain_ = gain;
             object.viewpoints.push_back(*it);
         }
@@ -145,28 +153,32 @@ void TargetPlanner::findTopViewpoints(Object& object, std::vector<TargetViewpoin
 
 }       
 
-float TargetPlanner::computeInformationGain(Object& object, const Eigen::Vector3d& sample_pos, const double& yaw){
+float TargetPlanner::computeInformationGain(Object& object, const Eigen::Vector3d& sample_pos, double yaw){
     
     Eigen::Vector3i idx;
     Eigen::Vector3i start_idx;
     Eigen::Vector3d pos;
     float total_gain = 0;
+    // wrapYaw(yaw );
     _percep_utils->setPose(sample_pos, yaw);
 
     Eigen::Vector3i bbox_min_idx;
     Eigen::Vector3i bbox_max_idx;
 
     //inflated bounding box around object bbox
-    Eigen::Vector3d bbox_min = object.bbox_min_ - Eigen::Vector3d(1,1,0.5);
-    Eigen::Vector3d bbox_max = object.bbox_max_ + Eigen::Vector3d(1,1,0.5);
-    _sdf_map->boundBox(bbox_min, bbox_max);
+    Eigen::Vector3d bbox_min = object.centroid_ - Eigen::Vector3d(1,1,0.5);
+    Eigen::Vector3d bbox_max = object.centroid_ + Eigen::Vector3d(1,1,0.5);
+    // _sdf_map->boundBox(bbox_min, bbox_max);
 
     _sdf_map->posToIndex(bbox_min, bbox_min_idx);
     _sdf_map->posToIndex(bbox_max, bbox_max_idx);
 
+    _sdf_map->boundIndex(bbox_min_idx);
+    _sdf_map->boundIndex(bbox_max_idx);
+
     for (int x = bbox_min_idx(0); x <= bbox_max_idx(0); ++x)
         for (int y = bbox_min_idx(1); y <= bbox_max_idx(1); ++y)
-            for (int z = _sdf_map->mp_->box_min_(2); z < _sdf_map->mp_->box_max_(2); ++z) {
+            for (int z = bbox_min_idx(2); z < bbox_max_idx(2); ++z) {
         int adr = _sdf_map->toAddress(x,y,z);
         _sdf_map->indexToPos(Eigen::Vector3i(x,y,z), pos);
 
@@ -195,10 +207,14 @@ float TargetPlanner::computeInformationGain(Object& object, const Eigen::Vector3
         // if (visib) total_gain += infoTransfer(point.intensity)*point.intensity;
         if (visib) total_gain += _diff_map->diffusion_buffer[adr];
     }
+    if (total_gain>1e5){
+        std::cout<<"invalid "<<pos.transpose()<<std::endl;
+    }
     return total_gain; 
 }
 
 bool TargetPlanner::isPtInView(const Eigen::Vector3d& point_world, const Eigen::Vector3d& pos, double yaw){
+    if ((point_world-pos).norm()>3) return false; 
     // World to viewpoint
     Eigen::Isometry3d T_world_sample; // world with respect to sample
     T_world_sample.translation() = pos;

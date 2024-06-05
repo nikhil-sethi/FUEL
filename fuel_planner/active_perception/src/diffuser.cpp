@@ -39,19 +39,18 @@ Diffuser::Diffuser(const shared_ptr<fast_planner::EDTEnvironment>& edt, ros::Nod
     _sdf_map = edt->sdf_map_;
 
     // Params
-    // nh.param("/perception/attention_map/3d/diffusion_factor", _diffusion_factor, 0.9f); 
     nh.param("/diffusion/sigma", _kernel_sigma, 2); 
     nh.param("/diffusion/kernel_size", _kernel_size, 3); 
     _att_min = _att_map->getAttMin();
 
     // member variables
-    diffusion_buffer = std::vector<float>(_sdf_map->buffer_size, 0);
+    diffusion_buffer = std::vector<float>(_sdf_map->buffer_size, 0.0f);
     _kernel_weights = calculateGaussianKernel(_kernel_size, _kernel_sigma, false);
     _kernel_depth = (_kernel_size - 1)/2;
 
     // ROS
-    _diffusion_timer = nh.createTimer(ros::Duration(0.1), &Diffuser::diffusionTimer, this);
-    _map_pub = nh.advertise<sensor_msgs::PointCloud2>("/attention_map/diffused", 1);
+    // _diffusion_timer = nh.createTimer(ros::Duration(0.1), &Diffuser::diffusionTimer, this);
+    _map_pub = nh.advertise<sensor_msgs::PointCloud2>("/priority_map/diffused", 1);
 }
 
 void Diffuser::setFrontierFinder(std::shared_ptr<fast_planner::FrontierFinder>& ff_ptr){
@@ -80,7 +79,7 @@ float Diffuser::partialConvolution(const Eigen::Vector3i& voxel){
         _sdf_map->indexToPos(nbr, nbr_pos);
         int nbr_adr = _sdf_map->toAddress(nbr);
 
-        if (!_sdf_map->isInMap(nbr) || nbr_pos(2)<0.1)
+        if (!_sdf_map->isInMap(nbr) || nbr_pos(2)<=0.2)
             continue;
 
         float attention = _att_map->priority_buffer[nbr_adr] + diffusion_buffer[nbr_adr];
@@ -110,11 +109,12 @@ void Diffuser::diffusionTimer(const ros::TimerEvent& event){
 
     for (int x = min_cut(0); x <= max_cut(0); ++x)
         for (int y = min_cut(1); y <= max_cut(1); ++y)
-            for (int z = _sdf_map->mp_->box_min_(2); z < _sdf_map->mp_->box_max_(2); ++z) {
+            for (int z = 2; z < _sdf_map->mp_->box_max_(2); ++z) {
                 
                 int adr = _sdf_map->toAddress(x,y,z);            
+
                 // diffusion map only contains frontiers
-                if (_ff->frontier_flag_[adr]==0){
+                if (_ff->frontier_flag_[adr]==0|| z<=2){ // z filter removes noise close to ground and avoids getting stuck
                     diffusion_buffer[adr]=0;
                     continue;
                 }

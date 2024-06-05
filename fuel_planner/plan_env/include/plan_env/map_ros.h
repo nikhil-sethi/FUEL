@@ -16,12 +16,12 @@
 #include <memory>
 #include <random>
 
-#include <plan_env/attention_map.h>
+#include <plan_env/priority_map.h>
 using std::shared_ptr;
 using std::normal_distribution;
 using std::default_random_engine;
 
-class AttentionMap;
+class PriorityMap;
 
 namespace fast_planner {
 class SDFMap;
@@ -31,7 +31,7 @@ public:
   MapROS();
   ~MapROS();
   void setMap(SDFMap* map);
-  void setAttentionMap(std::shared_ptr<AttentionMap> att_map);
+  void setPriorityMap(std::shared_ptr<PriorityMap> att_map);
 
   void init(ros::NodeHandle& nh);
 
@@ -70,7 +70,7 @@ private:
   std::fstream entropy_file;
 
   SDFMap* map_;
-  std::shared_ptr<AttentionMap> _att_map;
+  std::shared_ptr<PriorityMap> _att_map;
   // may use ExactTime?
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped>
       SyncPolicyImagePose;

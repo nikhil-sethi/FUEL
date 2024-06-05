@@ -54,7 +54,7 @@ FrontierFinder::FrontierFinder(const EDTEnvironment::Ptr& edt, ros::NodeHandle& 
 FrontierFinder::~FrontierFinder() {
 }
 
-void FrontierFinder::searchFrontiers() {
+void FrontierFinder::searchNewFrontiers() {
   ros::Time t1 = ros::Time::now();
   tmp_frontiers_.clear();
 
@@ -62,60 +62,6 @@ void FrontierFinder::searchFrontiers() {
   Vector3d update_min, update_max;
   edt_env_->sdf_map_->getUpdatedBox(update_min, update_max, true);
 
-  // Removed changed frontiers in updated map
-  auto resetFlag = [&](list<Frontier>::iterator& iter, list<Frontier>& frontiers) {
-    Eigen::Vector3i idx;
-    for (auto cell : iter->cells_) {
-      edt_env_->sdf_map_->posToIndex(cell, idx);
-      frontier_flag_[toadr(idx)] = 0;
-    }
-    iter = frontiers.erase(iter);
-  };
-
-  // std::cout << "Before remove: " << frontiers_.size() << std::endl;
-
-  removed_ids_.clear();
-  int rmv_idx = 0;
-  for (auto iter = frontiers_.begin(); iter != frontiers_.end();) {
-    if (haveOverlap(iter->box_min_, iter->box_max_, update_min, update_max) &&
-        isFrontierChanged(*iter)) {
-      resetFlag(iter, frontiers_);
-      removed_ids_.push_back(rmv_idx);
-    } else {
-      ++rmv_idx;
-      ++iter;
-    }
-  }
-  // std::cout << "After remove: " << frontiers_.size() << std::endl;
-  for (auto iter = dormant_frontiers_.begin(); iter != dormant_frontiers_.end();) {
-    if (haveOverlap(iter->box_min_, iter->box_max_, update_min, update_max) &&
-        isFrontierChanged(*iter))
-      resetFlag(iter, dormant_frontiers_);
-    else
-      ++iter;
-  }
-
-  // std::fill(frontier_flag_.begin(), frontier_flag_.end(), false);
-  // frontiers_.clear();
-  // dormant_frontiers_.clear();
-  if (use_active_perception_){
-    Eigen::Vector3i min_id_ff, max_id_ff;
-    edt_env_->sdf_map_->posToIndex(update_min, min_id_ff);
-    edt_env_->sdf_map_->posToIndex(update_max, max_id_ff);
-    edt_env_->sdf_map_->boundIndex(max_id_ff);
-    edt_env_->sdf_map_->boundIndex(min_id_ff);
-    
-    std::cout<<update_min.transpose()<<std::endl;
-    std::cout<<update_max.transpose()<<std::endl;
-
-    for (int x = min_id_ff(0); x <= max_id_ff(0); ++x)
-      for (int y = min_id_ff(1); y <= max_id_ff(1); ++y)
-        for (int z = min_id_ff(2); z <= max_id_ff(2); ++z) {
-          Eigen::Vector3i cur(x, y, z);
-          if (!(knownfree(cur) && isNeighborUnknown(cur)))
-              frontier_flag_[toadr(cur)] = 0;
-        }
-  }
 
   // Search new frontier within box slightly inflated from updated box
   Vector3d search_min = update_min - Vector3d(1, 1, 0.5);
@@ -144,6 +90,66 @@ void FrontierFinder::searchFrontiers() {
 
   ROS_WARN_THROTTLE(5.0, "Frontier t: %lf", (ros::Time::now() - t1).toSec());
 }
+
+
+void FrontierFinder::removeOldFrontiers(){
+    // Bounding box of updated region
+    Vector3d update_min, update_max;
+    edt_env_->sdf_map_->getUpdatedBox(update_min, update_max, true);
+
+    // Removed changed frontiers in updated map
+    auto resetFlag = [&](list<Frontier>::iterator& iter, list<Frontier>& frontiers) {
+      Eigen::Vector3i idx;
+      for (auto cell : iter->cells_) {
+        edt_env_->sdf_map_->posToIndex(cell, idx);
+        frontier_flag_[toadr(idx)] = 0;
+      }
+      iter = frontiers.erase(iter);
+    };
+
+    // std::cout << "Before remove: " << frontiers_.size() << std::endl;
+
+    removed_ids_.clear();
+    int rmv_idx = 0;
+    for (auto iter = frontiers_.begin(); iter != frontiers_.end();) {
+      if (haveOverlap(iter->box_min_, iter->box_max_, update_min, update_max) &&
+          isFrontierChanged(*iter)) {
+        resetFlag(iter, frontiers_);
+        removed_ids_.push_back(rmv_idx);
+      } else {
+        ++rmv_idx;
+        ++iter;
+      }
+    }
+    // std::cout << "After remove: " << frontiers_.size() << std::endl;
+    for (auto iter = dormant_frontiers_.begin(); iter != dormant_frontiers_.end();) {
+      if (haveOverlap(iter->box_min_, iter->box_max_, update_min, update_max) &&
+          isFrontierChanged(*iter))
+        resetFlag(iter, dormant_frontiers_);
+      else
+        ++iter;
+    }
+
+      // if (use_active_perception_){
+      //   Eigen::Vector3i min_id_ff, max_id_ff;
+      //   edt_env_->sdf_map_->posToIndex(update_min, min_id_ff);
+      //   edt_env_->sdf_map_->posToIndex(update_max, max_id_ff);  
+      //   edt_env_->sdf_map_->boundIndex(max_id_ff);
+      //   edt_env_->sdf_map_->boundIndex(min_id_ff);
+        
+      //   std::cout<<update_min.transpose()<<std::endl;
+      //   std::cout<<update_max.transpose()<<std::endl;
+
+      //   for (int x = min_id_ff(0); x <= max_id_ff(0); ++x)
+      //     for (int y = min_id_ff(1); y <= max_id_ff(1); ++y)
+      //       for (int z = min_id_ff(2); z <= max_id_ff(2); ++z) {
+      //         Eigen::Vector3i cur(x, y, z);
+      //         if (!(knownfree(cur) && isNeighborUnknown(cur)))
+      //             frontier_flag_[toadr(cur)] = 0;
+      //       }
+      // }
+}
+
 
 // void FrontierFinder::searchObjects(){
 //   // create a box in which to search for attentive cells
@@ -247,7 +253,7 @@ void FrontierFinder::expandFrontier(
         continue;
 
       edt_env_->sdf_map_->indexToPos(nbr, pos);
-      if (pos[2] < 0.01) continue;  // Remove noise close to ground
+      if (pos[2] <=0.01) continue;  // Remove noise close to ground
       expanded.push_back(pos);
       cell_queue.push(nbr);
       frontier_flag_[adr] = 1;
@@ -808,6 +814,7 @@ int FrontierFinder::countVisibleCells(
     const Eigen::Vector3d& pos, const double& yaw, const vector<Eigen::Vector3d>& cluster) {
   percep_utils_->setPose(pos, yaw);
   float visib_num = 0;
+  float total_gain = 0;
   Eigen::Vector3i idx;
   
   for (auto cell : cluster) {
@@ -829,12 +836,13 @@ int FrontierFinder::countVisibleCells(
     int cell_adr =  edt_env_->sdf_map_->toAddress(cell_idx);
     if (visib) {
       float gain = diffuser_->diffusion_buffer[cell_adr];
-      visib_num += std::exp(gamma*(gain-1));
+      total_gain += std::max(std::exp(gamma*(gain-1)), 1.0f);
       // visib_num += 1;
       // std::cout<<diffuser_->diffusion_buffer[cell_adr]<<std::endl;
     }
   }
-  return (int)std::round(visib_num);
+  // std::cout<<"total gain: "<<(int)std::round(total_gain) <<"coverage: "<<visib_num<<std::endl;
+  return (int)std::round(total_gain);
 }
 
 void FrontierFinder::downsample(

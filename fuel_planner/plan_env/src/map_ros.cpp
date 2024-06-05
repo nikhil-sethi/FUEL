@@ -20,7 +20,7 @@ void MapROS::setMap(SDFMap* map) {
   this->map_ = map;
 }
 
-void MapROS::setAttentionMap(std::shared_ptr<AttentionMap> att_map_ptr) {
+void MapROS::setPriorityMap(std::shared_ptr<PriorityMap> att_map_ptr) {
   this->_att_map = att_map_ptr;
 }
 
@@ -81,8 +81,8 @@ void MapROS::init(ros::NodeHandle& nh) {
   pose_sub_.reset(
       new message_filters::Subscriber<geometry_msgs::PoseStamped>(nh, "/map_ros/pose", 25));
 
-  // att_sub_ = nh.subscribe("/iris_depth_camera/attention_map/2d", 10, &MapROS::attCallback, this);
-  att_sub_.reset(new message_filters::Subscriber<sensor_msgs::CompressedImage>(nh, "/attention_map/2d/compressed", 50));
+  // att_sub_ = nh.subscribe("/iris_depth_camera/priority_map/2d", 10, &MapROS::attCallback, this);
+  att_sub_.reset(new message_filters::Subscriber<sensor_msgs::CompressedImage>(nh, "/priority_mask/compressed", 50));
   
   sync_image_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePose>(
       MapROS::SyncPolicyImagePose(100), *depth_sub_, *pose_sub_));
@@ -97,7 +97,7 @@ void MapROS::init(ros::NodeHandle& nh) {
   sync_image_pose_compimage->registerCallback(boost::bind(&MapROS::depthPoseAttCallback, this, _1, _2, _3));
   map_start_time_ = ros::Time::now();
 
-  att_3d_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/attention_map/local", 10);
+  att_3d_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/priority_map/local", 10);
   att_image_.reset(new cv::Mat);
   att_image_.reset(new cv::Mat(480,848, CV_8UC1));
   (*att_image_).setTo(cv::Scalar::all(0));

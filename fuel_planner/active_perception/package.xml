@@ -68,6 +68,7 @@
   <exec_depend>bspline</exec_depend>
   <exec_depend>path_searching</exec_depend>
   <depend>sensor_model</depend>
+  <depend>common</depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

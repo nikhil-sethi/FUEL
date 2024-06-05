@@ -124,8 +124,6 @@ void SDFMap::initMap(MapROS* map_ros, ros::NodeHandle& nh) {
 
   // Initialize ROS wrapper
   mr_->setMap(this);
-  // mr_->node_ = nh;
-  // mr_->init();
 
   caster_.reset(new RayCaster);
   caster_->setParams(mp_->resolution_, mp_->map_origin_);

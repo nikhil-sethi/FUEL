@@ -18,7 +18,7 @@ class Mat;
 }
 
 class RayCaster;
-class AttentionMap;
+class PriorityMap;
 class Diffuser;
 class ObjectFinder;
 class TargetPlanner;
@@ -73,7 +73,7 @@ public:
   void getUpdatedBox(Eigen::Vector3d& bmin, Eigen::Vector3d& bmax, bool reset = false);
   double getResolution();
   int getVoxelNum();
-  void processAttentionMap();
+  void processPriorityMap();
   void setParams(ros::NodeHandle& nh, std::string ns="");
   void loadGTAttMap();
   void closeFile();
@@ -93,7 +93,7 @@ private:
   unique_ptr<RayCaster> caster_;
 
   friend MapROS;
-  friend class ::AttentionMap; // in global namespace
+  friend class ::PriorityMap; // in global namespace
   friend class ::Diffuser;
   friend class ::ObjectFinder;
   friend class ::TargetPlanner;

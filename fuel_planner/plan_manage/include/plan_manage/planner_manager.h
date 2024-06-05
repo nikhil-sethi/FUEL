@@ -16,7 +16,7 @@
 
 #include <plan_manage/plan_container.hpp>
 
-#include <plan_env/attention_map.h>
+#include <plan_env/priority_map.h>
 #include <active_perception/diffuser.h>
 
 
@@ -62,7 +62,7 @@ public:
   unique_ptr<Astar> path_finder_;
   unique_ptr<TopologyPRM> topo_prm_;
   shared_ptr<Diffuser> diffuser_;
-  shared_ptr<AttentionMap> att_map;
+  shared_ptr<PriorityMap> att_map;
 
 private:
   /* main planning algorithms & modules */

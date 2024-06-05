@@ -42,7 +42,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 
 
 add_library( plan_env 
-    src/attention_map.cpp 
+    src/priority_map.cpp 
     src/sdf_map.cpp 
     src/obj_predictor.cpp 
     src/edt_environment.cpp 

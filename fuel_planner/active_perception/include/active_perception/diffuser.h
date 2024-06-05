@@ -2,7 +2,7 @@
 #define DIFFUSION_H
 
 #include <plan_env/edt_environment.h>
-#include <plan_env/attention_map.h>
+#include <plan_env/priority_map.h>
 #include <active_perception/frontier_finder.h>
 
 class fast_planner::SDFMap;
@@ -11,16 +11,17 @@ class Diffuser{
     public:
         Diffuser(const shared_ptr<fast_planner::EDTEnvironment>& edt, ros::NodeHandle& nh);
         void setFrontierFinder(std::shared_ptr<fast_planner::FrontierFinder>& ff_ptr);
+        void diffusionTimer(const ros::TimerEvent& event);
         std::vector<float> diffusion_buffer;
 
     private:
         // Member functions
-        void diffusionTimer(const ros::TimerEvent& event);
+        
         void publishDiffusionMap();
         float partialConvolution(const Eigen::Vector3i& voxel);
 
         // Member variables
-        std::shared_ptr<AttentionMap> _att_map;
+        std::shared_ptr<PriorityMap> _att_map;
         std::shared_ptr<fast_planner::SDFMap> _sdf_map;
         std::shared_ptr<fast_planner::FrontierFinder> _ff;
         std::vector<std::vector<std::vector<float>>> _kernel_weights;

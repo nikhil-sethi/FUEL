@@ -138,13 +138,15 @@ int FastExplorationManager::planExploreMotion(
 
   // std::cout << "start pos: " << pos.transpose() << ", vel: " << vel.transpose()
             // << ", acc: " << acc.transpose() << std::endl;
+  
 
   // ===== FIND FRONTIERS =======
   // Search frontiers and group them into clusters
-  frontier_finder_->searchFrontiers();
+  frontier_finder_->removeOldFrontiers();
+  frontier_finder_->searchNewFrontiers();
 
-  // int sum = std::accumulate(frontier_finder_->frontier_flag_.begin(), frontier_finder_->frontier_flag_.end(), 0);
-  // std::cout<< sum<<std::endl;
+  // diffusion
+  planner_manager_->diffuser_->diffusionTimer(ros::TimerEvent());
 
   double frontier_time = (ros::Time::now() - t1).toSec();
   t1 = ros::Time::now();
@@ -154,7 +156,8 @@ int FastExplorationManager::planExploreMotion(
   frontier_finder_->getFrontiers(ed_->frontiers_);
   frontier_finder_->getFrontierBoxes(ed_->frontier_boxes_);
   frontier_finder_->getDormantFrontiers(ed_->dead_frontiers_);
-    
+  
+  
   if (!ed_->frontiers_.empty())
     frontier_finder_->updateFrontierCostMatrix();
     
@@ -197,7 +200,8 @@ int FastExplorationManager::planExploreMotion(
 
     // TSP
     else if (num_targets_vpts>1){
-    
+      t1 = ros::Time::now();
+
       Eigen::MatrixXd cost_mat;
       getTargetCostMatrix(pos, vel, yaw, cost_mat);
 
@@ -210,12 +214,9 @@ int FastExplorationManager::planExploreMotion(
         // make all priorities same if semantic search is off
         if (!use_semantic_search_){
           std::fill(priorities.begin(), priorities.end(), 1);
-          // for (auto& p: priorities){
-          //   p = 1;
-          // }
         }
 
-      solveMOTSP(cost_mat, priorities, indices);     
+        solveMOTSP(cost_mat, priorities, indices);     
       }
       
       // solve the TSP and read the tour as indices
@@ -224,6 +225,10 @@ int FastExplorationManager::planExploreMotion(
       
       // Get the path of optimal tour from path matrix
       getPathForTour(pos, indices, ed_->global_tour_);
+
+      double tsp_time = (ros::Time::now()-t1).toSec();
+      ROS_WARN("Target TSP time: %lf", tsp_time);
+
 
       // Choose the next viewpoint from global tour
       auto vpt = target_vpts[indices[0]];
@@ -256,6 +261,8 @@ int FastExplorationManager::planExploreMotion(
       // Find the global tour passing through all viewpoints
       // Create TSP and solve by LKH
       // Optimal tour is returned as indices of frontier
+
+      t1 = ros::Time::now();
       vector<uint8_t> indices;     
 
       // Get cost matrix for current state and clusters
@@ -277,8 +284,12 @@ int FastExplorationManager::planExploreMotion(
         solveMOTSP(cost_mat, expl_priorities, indices);
       }
       
+
       // Get the Full Astar path of optimal tour
       frontier_finder_->getPathForTour(pos, indices, ed_->global_tour_);
+
+      double tsp_time = (ros::Time::now()-t1).toSec();
+      ROS_WARN("Exploration TSP time: %lf", tsp_time);
 
 
       if (ep_->refine_local_) {
@@ -438,7 +449,24 @@ int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eig
 
   const double radius_far = 3.0;
   const double radius_close = 1.5;  // don't change this below 1.5 or you'll observe a alot of kinodynamic search failures
+  const double radius_very_close = 0.2;
   const double len = Astar::pathLength(ed_->path_next_goal_);
+  // if (len<radius_very_close){
+  //    // Generate traj through waypoints-based method
+  //   const int pt_num = ed_->path_next_goal_.size();
+  //   Eigen::MatrixXd ctrl_pts(pt_num, 3);
+  //   for (int i = 0; i < pt_num; ++i) ctrl_pts.row(i) = ed_->path_next_goal_[i];
+
+  //     Eigen::Vector3d zero(0, 0, 0);
+  //     Eigen::VectorXd times(pt_num - 1);
+  //     for (int i = 0; i < pt_num - 1; ++i)
+  //       times(i) = (pos.row(i + 1) - pos.row(i)).norm() / (pp_.max_vel_ * 0.5);
+
+  //     PolynomialTraj init_traj;
+  //     PolynomialTraj::waypointsTraj(pos, cur_vel, zero, cur_acc, zero, times, init_traj);
+
+ 
+  // }
   if (len < radius_close) {
     // Next viewpoint is very close, no need to search kinodynamic path, just use waypoints-based
     // optimization
@@ -476,10 +504,14 @@ int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eig
       return FAIL;
   }
   double planned_time = planner_manager_->local_data_.position_traj_.getTimeSum();
-  if (planned_time < (time_lb - 0.1))
+  if (planned_time < (time_lb - 0.5)){
     ROS_ERROR("Lower bound not satified! planned: %f , estimated: %f", planned_time, time_lb-0.1);
-
+    // return FAIL;
+  }
+  // else{
   planner_manager_->planYawExplore(yaw, next_yaw, true, ep_->relax_time_);
+  // }
+  
 
   return SUCCEED;
 }

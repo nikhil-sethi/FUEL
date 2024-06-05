@@ -48,7 +48,7 @@ struct TargetViewpoint: fast_planner::Viewpoint{
 
     bool isClose(const TargetViewpoint& other){
         double dpsi = yaw_-other.yaw_;
-        return (pos_-other.pos_).norm() < 0.4 && abs(std::min(dpsi, 2*M_PI-dpsi))<0.4;
+        return (pos_-other.pos_).norm() < 0.4 && abs(std::min(dpsi, 2*M_PI-dpsi))<0.7;
     }
 };
 
@@ -69,7 +69,7 @@ class TargetPlanner{
         void informationGainTimer(const ros::TimerEvent& event);
         void sampleViewpoints(Object& object, std::vector<TargetViewpoint>& sampled_vpts);
         void findTopViewpoints(Object& object, std::vector<TargetViewpoint>& sampled_vpts);
-        float computeInformationGain(Object& object, const Eigen::Vector3d& sample_pos, const double& yaw);
+        float computeInformationGain(Object& object, const Eigen::Vector3d& sample_pos, double yaw);
         bool isObjectInView(const Object& object, const Eigen::Vector3d& pos, const Eigen::Vector3d& orient);
         void sortViewpoints(std::vector<TargetViewpoint>& vpts);
         float infoTransfer(float gain);
