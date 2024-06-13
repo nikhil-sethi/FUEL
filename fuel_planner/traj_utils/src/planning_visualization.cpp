@@ -1,4 +1,5 @@
 #include <traj_utils/planning_visualization.h>
+#include <std_msgs/ColorRGBA.h>
 
 using std::cout;
 using std::endl;
@@ -64,6 +65,38 @@ void PlanningVisualization::fillBasicInfo(visualization_msgs::Marker& mk, const 
   mk.scale.z = scale[2];
 }
 
+
+// overload for multiple colors inside a list type marker
+void PlanningVisualization::fillBasicInfo(visualization_msgs::Marker& mk, const Eigen::Vector3d& scale,
+                                          const std::vector<Eigen::Vector4d>& colors, const string& ns, const int& id,
+                                          const int& shape) {
+  mk.header.frame_id = "world";
+  mk.header.stamp = ros::Time::now();
+  mk.id = id;
+  mk.ns = ns;
+  mk.type = shape;
+
+  mk.pose.orientation.x = 0.0;
+  mk.pose.orientation.y = 0.0;
+  mk.pose.orientation.z = 0.0;
+  mk.pose.orientation.w = 1.0;
+  std::vector<std_msgs::ColorRGBA> colors_msg;
+  for (auto color:colors){
+      std_msgs::ColorRGBA color_msg;
+      color_msg.r = color(0);
+      color_msg.g = color(1);
+      color_msg.b = color(2);
+      color_msg.a = color(3);
+
+      colors_msg.push_back(color_msg);
+  }
+  mk.colors = colors_msg;
+  mk.scale.x = scale[0];
+  mk.scale.y = scale[1];
+  mk.scale.z = scale[2];
+}
+
+
 void PlanningVisualization::fillGeometryInfo(visualization_msgs::Marker& mk,
                                              const vector<Eigen::Vector3d>& list) {
   geometry_msgs::Point pt;
@@ -126,6 +159,26 @@ void PlanningVisualization::drawSpheres(const vector<Eigen::Vector3d>& list, con
   pubs_[pub_id].publish(mk);
   ros::Duration(0.0005).sleep();
 }
+
+void PlanningVisualization::drawSpheres(const vector<Eigen::Vector3d>& list, const double& scale,
+                                        const std::vector<Eigen::Vector4d>& colors, const string& ns, const int& id,
+                                        const int& pub_id) {
+  visualization_msgs::Marker mk;
+  fillBasicInfo(mk, Eigen::Vector3d(scale, scale, scale), colors, ns, id,
+                visualization_msgs::Marker::SPHERE_LIST);
+
+  // clean old marker
+  mk.action = visualization_msgs::Marker::DELETE;
+  pubs_[pub_id].publish(mk);
+
+  // pub new marker
+  fillGeometryInfo(mk, list);
+  mk.action = visualization_msgs::Marker::ADD;
+  pubs_[pub_id].publish(mk);
+  ros::Duration(0.0005).sleep();
+}
+
+
 
 void PlanningVisualization::drawCubes(const vector<Eigen::Vector3d>& list, const double& scale,
                                       const Eigen::Vector4d& color, const string& ns, const int& id,

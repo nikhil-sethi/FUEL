@@ -23,6 +23,11 @@ find_package(catkin REQUIRED COMPONENTS
   lkh_tsp_solver
   plan_manage
   cv_bridge
+  std_srvs
+  common_msgs
+  sensor_model
+  quadrotor_msgs
+  target_search
 )
 
 catkin_package(

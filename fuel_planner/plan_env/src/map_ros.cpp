@@ -5,6 +5,7 @@
 #include <pcl/point_types.h>
 #include <visualization_msgs/Marker.h>
 #include <common_msgs/uint8List.h>
+#include <ctime>
 
 #include <fstream>
 
@@ -19,24 +20,31 @@ void MapROS::setMap(SDFMap* map) {
   this->map_ = map;
 }
 
-void MapROS::init() {
-  node_.param("map_ros/fx", fx_, -1.0);
-  node_.param("map_ros/fy", fy_, -1.0);
-  node_.param("map_ros/cx", cx_, -1.0);
-  node_.param("map_ros/cy", cy_, -1.0);
-  node_.param("map_ros/depth_filter_maxdist", depth_filter_maxdist_, -1.0);
-  node_.param("map_ros/depth_filter_mindist", depth_filter_mindist_, -1.0);
-  node_.param("map_ros/depth_filter_margin", depth_filter_margin_, -1);
-  node_.param("map_ros/k_depth_scaling_factor", k_depth_scaling_factor_, -1.0);
-  node_.param("map_ros/skip_pixel", skip_pixel_, -1);
+void MapROS::setPriorityMap(std::shared_ptr<PriorityMap> att_map_ptr) {
+  this->_att_map = att_map_ptr;
+}
 
-  node_.param("map_ros/esdf_slice_height", esdf_slice_height_, -0.1);
-  node_.param("map_ros/visualization_truncate_height", visualization_truncate_height_, -0.1);
-  node_.param("map_ros/visualization_truncate_low", visualization_truncate_low_, -0.1);
-  node_.param("map_ros/show_occ_time", show_occ_time_, false);
-  node_.param("map_ros/show_esdf_time", show_esdf_time_, false);
-  node_.param("map_ros/show_all_map", show_all_map_, false);
-  node_.param("map_ros/frame_id", frame_id_, string("world"));
+void MapROS::init(ros::NodeHandle& nh) {
+
+  nh.param("map_ros/fx", fx_, -1.0);
+  nh.param("map_ros/fy", fy_, -1.0);
+  nh.param("map_ros/cx", cx_, -1.0);
+  nh.param("map_ros/cy", cy_, -1.0);
+  nh.param("map_ros/depth_filter_maxdist", depth_filter_maxdist_, -1.0);
+  nh.param("map_ros/depth_filter_mindist", depth_filter_mindist_, -1.0);
+  nh.param("map_ros/depth_filter_margin", depth_filter_margin_, -1);
+  nh.param("map_ros/k_depth_scaling_factor", k_depth_scaling_factor_, -1.0);
+  nh.param("map_ros/skip_pixel", skip_pixel_, -1);
+
+  nh.param("map_ros/esdf_slice_height", esdf_slice_height_, -0.1);
+  nh.param("map_ros/visualization_truncate_height", visualization_truncate_height_, -0.1);
+  nh.param("map_ros/visualization_truncate_low", visualization_truncate_low_, -0.1);
+  nh.param("map_ros/show_occ_time", show_occ_time_, false);
+  nh.param("map_ros/show_esdf_time", show_esdf_time_, false);
+  nh.param("map_ros/show_all_map", show_all_map_, false);
+  nh.param("map_ros/frame_id", frame_id_, string("world"));
+
+  nh.param("priority_map/pmax", p_max, 5);
 
   proj_points_.resize(640 * 480 / (skip_pixel_ * skip_pixel_));
   point_cloud_.points.resize(640 * 480 / (skip_pixel_ * skip_pixel_));
@@ -57,50 +65,59 @@ void MapROS::init() {
   random_device rd;
   eng_ = default_random_engine(rd());
 
-  esdf_timer_ = node_.createTimer(ros::Duration(0.05), &MapROS::updateESDFCallback, this);
-  vis_timer_ = node_.createTimer(ros::Duration(0.05), &MapROS::visCallback, this);
+  esdf_timer_ = nh.createTimer(ros::Duration(0.05), &MapROS::updateESDFCallback, this);
+  vis_timer_ = nh.createTimer(ros::Duration(0.05), &MapROS::visCallback, this);
 
-  map_all_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/sdf_map/occupancy_all", 10);
-  map_local_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/sdf_map/occupancy_local", 10);
+  map_all_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/sdf_map/occupancy_all", 10);
+  map_local_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/sdf_map/occupancy_local", 10);
   map_local_inflate_pub_ =
-      node_.advertise<sensor_msgs::PointCloud2>("/sdf_map/occupancy_local_inflate", 10);
-  unknown_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/sdf_map/unknown", 10);
-  esdf_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/sdf_map/esdf", 10);
-  update_range_pub_ = node_.advertise<visualization_msgs::Marker>("/sdf_map/update_range", 10);
-  depth_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/sdf_map/depth_cloud", 10);
+      nh.advertise<sensor_msgs::PointCloud2>("/sdf_map/occupancy_local_inflate", 10);
+  unknown_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/sdf_map/unknown", 10);
+  esdf_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/sdf_map/esdf", 10);
+  update_range_pub_ = nh.advertise<visualization_msgs::Marker>("/sdf_map/update_range", 10);
+  depth_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/sdf_map/depth_cloud", 10);
 
-  depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(node_, "/map_ros/depth", 50));
+  depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(nh, "/map_ros/depth", 50));
   cloud_sub_.reset(
-      new message_filters::Subscriber<sensor_msgs::PointCloud2>(node_, "/map_ros/cloud", 50));
+      new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, "/map_ros/cloud", 50));
   pose_sub_.reset(
-      new message_filters::Subscriber<geometry_msgs::PoseStamped>(node_, "/map_ros/pose", 25));
+      new message_filters::Subscriber<geometry_msgs::PoseStamped>(nh, "/map_ros/pose", 25));
 
-  // att_sub_ = node_.subscribe("/iris_depth_camera/attention_map/2d", 10, &MapROS::attCallback, this);
-  att_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(node_, "/iris_depth_camera/attention_map/2d", 50));
+  // att_sub_ = nh.subscribe("/iris_depth_camera/priority_map/2d", 10, &MapROS::attCallback, this);
+  att_sub_.reset(new message_filters::Subscriber<sensor_msgs::CompressedImage>(nh, "/priority_mask/compressed", 50));
   
   sync_image_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePose>(
       MapROS::SyncPolicyImagePose(100), *depth_sub_, *pose_sub_));
   
-  sync_image_pose_image.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePoseImage>(
-      MapROS::SyncPolicyImagePoseImage(100), *depth_sub_, *pose_sub_, *att_sub_));
+  sync_image_pose_compimage.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePoseCompressedImage>(
+      MapROS::SyncPolicyImagePoseCompressedImage(100), *depth_sub_, *pose_sub_, *att_sub_));
 
   // sync_image_pose_->registerCallback(boost::bind(&MapROS::depthPoseCallback, this, _1, _2));
   sync_cloud_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyCloudPose>(
       MapROS::SyncPolicyCloudPose(100), *cloud_sub_, *pose_sub_));
   sync_cloud_pose_->registerCallback(boost::bind(&MapROS::cloudPoseCallback, this, _1, _2));
-  sync_image_pose_image->registerCallback(boost::bind(&MapROS::depthPoseAttCallback, this, _1, _2, _3));
+  sync_image_pose_compimage->registerCallback(boost::bind(&MapROS::depthPoseAttCallback, this, _1, _2, _3));
   map_start_time_ = ros::Time::now();
 
-  att_3d_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/attention_map/local", 10);
+  att_3d_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/priority_map/local", 10);
   att_image_.reset(new cv::Mat);
   att_image_.reset(new cv::Mat(480,848, CV_8UC1));
   (*att_image_).setTo(cv::Scalar::all(0));
 
-  occ_pub_ = node_.advertise<common_msgs::uint8List>("/occupancy_buffer/", 10);
-  occ_inflate_pub_ = node_.advertise<common_msgs::uint8List>("/occupancy_buffer_inflate/", 10);
+  entropy_pub = nh.advertise<common_msgs::Float64Stamped>("/data/weighted_entropy", 10);
+
+  // occ_pub_ = nh.advertise<common_msgs::uint8List>("/occupancy_buffer/", 10);
+  // occ_inflate_pub_ = nh.advertise<common_msgs::uint8List>("/occupancy_buffer_inflate/", 10);
   
-  occupancy_buffer_light = vector<uint8_t>(map_->md_->occupancy_buffer_.size(), 0); 
-  occ_timer_ = node_.createTimer(ros::Duration(0.05), &MapROS::occupancyTimer, this);
+  // occupancy_buffer_light = vector<uint8_t>(map_->buffer_size, 0); 
+  // occ_timer_ = nh.createTimer(ros::Duration(0.05), &MapROS::occupancyTimer, this);
+  
+  // metrics
+  metrics_timer = nh.createTimer(ros::Duration(1), &MapROS::metricsTimer, this);
+
+  // current date/time based on current system
+  time_t now = time(0);
+   
 }
 
 void MapROS::visCallback(const ros::TimerEvent& e) {
@@ -141,7 +158,7 @@ void MapROS::updateESDFCallback(const ros::TimerEvent& /*event*/) {
 
 void MapROS::depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
                                const geometry_msgs::PoseStampedConstPtr& pose,
-                               const sensor_msgs::ImageConstPtr& att) {
+                               const sensor_msgs::CompressedImageConstPtr& att) {
   camera_pos_(0) = pose->pose.position.x;
   camera_pos_(1) = pose->pose.position.y;
   camera_pos_(2) = pose->pose.position.z;
@@ -157,13 +174,16 @@ void MapROS::depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
 
   auto t1 = ros::Time::now();
 
-  cv_bridge::CvImagePtr cv_ptr_att = cv_bridge::toCvCopy(att, att->encoding);
+  cv_bridge::CvImagePtr cv_ptr_att = cv_bridge::toCvCopy(att);
   cv_ptr_att->image.copyTo(*att_image_);
+
+  // att_image = cv::imdecode(cv::Mat(att->data),1)
 
 
   // generate point cloud, update map
   proessDepthImage();
   map_->inputPointCloud(point_cloud_, proj_points_cnt, camera_pos_);
+  _att_map->inputPointCloud(point_cloud_);
   if (local_updated_) {
     map_->clearAndInflateLocalMap();
     esdf_need_update_ = true;
@@ -222,7 +242,7 @@ void MapROS::proessDepthImage() {
       depth = (*row_ptr) * inv_factor;
       row_ptr = row_ptr + skip_pixel_;
         // if (attention_needs_update_){
-      attention = att_row_ptr[u]/(2*255.0f);
+      attention = p_max*att_row_ptr[u]/(255.0f);
       //  }
       // // filter depth
       // if (depth > 0.01)
@@ -235,7 +255,7 @@ void MapROS::proessDepthImage() {
       // TODO: simplify the logic here
       if (*row_ptr == 0 || depth > depth_filter_maxdist_){
         depth = depth_filter_maxdist_;
-        attention = 0;
+        attention = 0;  // TODO decide how to handle beyond range points. might be useful
       }
       else if (depth < depth_filter_mindist_)
         continue;
@@ -244,36 +264,13 @@ void MapROS::proessDepthImage() {
       pt_cur(1) = (v - cy_) * depth / fy_;
       pt_cur(2) = depth;
       pt_world = camera_r * pt_cur + camera_pos_;
-      if (pt_world(2)<0.1)
+      if (pt_world(2)<0.0)
         attention = 0;
       auto& pt = point_cloud_.points[proj_points_cnt++];
       pt.x = pt_world[0];
       pt.y = pt_world[1];
       pt.z = pt_world[2];
       pt.intensity = attention;
-
-      // if (pt_world(2)>0.1){
-      //   Eigen::Vector3i idx;
-
-      //   map_->posToIndex(pt_world, idx);
-      //   int vox_adr = map_->toAddress(idx);
-      //   if (map_->isInMap(idx)){
-            
-      //       // soft update trials
-          
-      //       // if (map_->md_->occupancy_buffer_inflate_[vox_adr] == 1) //update attention only for inflated occupied cells
-      //       // if (map_->md_->occupancy_buffer_[vox_adr] > map_->mp_->min_occupancy_log_){ //update attention only for occupied cells
-      //       // map_->md_->attention_buffer_[vox_adr] = alpha*attention + (1-alpha)*map_->md_->attention_buffer_[vox_adr];
-      //       if (map_->getOccupancy(idx) == map_->OCCUPIED){
-      //       map_->md_->attention_buffer_[vox_adr] = alpha*attention + (1-alpha)*map_->md_->attention_buffer_[vox_adr];
-      //         // map_->md_->attention_buffer_[vox_adr]  = attention;
-      //       }
-      //       else{
-      //         map_->md_->attention_buffer_[vox_adr]  =  0;  
-      //       }
-      //       // ROS_ERROR_STREAM("new: "<<map_->md_->attention_buffer_[vox_adr]);
-      //     }
-      // }
     }
   }
 
@@ -453,12 +450,12 @@ void MapROS::publishDepth() {
     pt.y = point_cloud_.points[i].y;
     pt.z = point_cloud_.points[i].z;
     cloud.push_back(pt);
-    if (point_cloud_.points[i].intensity >0.001){ // only valid semantic points
+    if (point_cloud_.points[i].intensity >=1){ // only valid semantic points
       att_cloud.push_back(point_cloud_.points[i]);
     }
   }
   cloud.width = cloud.points.size();
-  cloud.height = 1;
+  cloud.height = 1; 
   cloud.is_dense = true;
   cloud.header.frame_id = frame_id_;
   sensor_msgs::PointCloud2 cloud_msg;
@@ -599,6 +596,23 @@ void MapROS::attCallback(const sensor_msgs::ImageConstPtr& img) {
   attention_needs_update_ = true;
 }
 
+
+void MapROS::metricsTimer(const ros::TimerEvent& event){
+  // calculate weighted map entropy
+  float entropy=0;
+  for (int i=0; i<map_->buffer_size; i++){
+    float prob = (map_->getOccupancy(i)==SDFMap::UNKNOWN? 0.5:1);
+    float weight = map_->diffusion_buffer_gt[i];
+    entropy += weight*prob*(-log2(prob));
+    // std::cout<<i <<" ";
+  }
+  // entropy_file<< ros::Time::now() <<","<< entropy<<"\n";
+  // ROS_ERROR("Entropy: %f", entropy);
+  common_msgs::Float64Stamped msg;
+  msg.header.stamp = ros::Time::now();
+  msg.data = entropy;
+  entropy_pub.publish(msg);
+}
 
 
 }

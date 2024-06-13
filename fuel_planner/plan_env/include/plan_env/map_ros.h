@@ -12,13 +12,18 @@
 #include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
+#include <sensor_msgs/CompressedImage.h>
+#include <common_msgs/Float64Stamped.h>
 
 #include <memory>
 #include <random>
 
+#include <plan_env/priority_map.h>
 using std::shared_ptr;
 using std::normal_distribution;
 using std::default_random_engine;
+
+class PriorityMap;
 
 namespace fast_planner {
 class SDFMap;
@@ -28,14 +33,19 @@ public:
   MapROS();
   ~MapROS();
   void setMap(SDFMap* map);
-  void init();
+  void setPriorityMap(std::shared_ptr<PriorityMap> att_map);
+
+  void init(ros::NodeHandle& nh);
 
 private:
   void depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
                          const geometry_msgs::PoseStampedConstPtr& pose,
-                         const sensor_msgs::ImageConstPtr& att);
+                         const sensor_msgs::CompressedImageConstPtr& att);
   void cloudPoseCallback(const sensor_msgs::PointCloud2ConstPtr& msg,
                          const geometry_msgs::PoseStampedConstPtr& pose);
+  
+  void metricsTimer(const ros::TimerEvent& /*event*/);
+
   void updateESDFCallback(const ros::TimerEvent& /*event*/);
   void visCallback(const ros::TimerEvent& /*event*/);
 
@@ -52,35 +62,37 @@ private:
   void attCallback(const sensor_msgs::ImageConstPtr& img);
   unique_ptr<cv::Mat> att_image_; // holds 2d attention map
   // ros::Subscriber att_sub_; // subscribes to 2d attention map
-  ros::Publisher att_3d_pub_;  // publish 3d attention map
+  ros::Publisher att_3d_pub_, entropy_pub;  // publish 3d attention map
   bool attention_needs_update_ = false;
   ros::Publisher occ_pub_;  // publish occupancy buffer
   ros::Publisher occ_inflate_pub_;  // publish inflated occupancy buffer
-  ros::Timer occ_timer_;
+  ros::Timer occ_timer_, metrics_timer;
   vector<uint8_t> occupancy_buffer_light;
   void occupancyTimer(const ros::TimerEvent& e); // publishing occupancy buffer
+  std::fstream entropy_file;
 
   SDFMap* map_;
+  std::shared_ptr<PriorityMap> _att_map;
   // may use ExactTime?
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped>
       SyncPolicyImagePose;
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped, sensor_msgs::Image>
-      SyncPolicyImagePoseImage;
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped, sensor_msgs::CompressedImage>
+      SyncPolicyImagePoseCompressedImage;
       
   typedef shared_ptr<message_filters::Synchronizer<SyncPolicyImagePose>> SynchronizerImagePose;
-  typedef shared_ptr<message_filters::Synchronizer<SyncPolicyImagePoseImage>> SynchronizerImagePoseImage;
+  typedef shared_ptr<message_filters::Synchronizer<SyncPolicyImagePoseCompressedImage>> SynchronizerImagePoseCompressedImage;
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2,
                                                           geometry_msgs::PoseStamped>
       SyncPolicyCloudPose;
   typedef shared_ptr<message_filters::Synchronizer<SyncPolicyCloudPose>> SynchronizerCloudPose;
 
-  ros::NodeHandle node_;
+  // ros::NodeHandle node_;
   shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depth_sub_;
   shared_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> cloud_sub_;
   shared_ptr<message_filters::Subscriber<geometry_msgs::PoseStamped>> pose_sub_;
-  shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> att_sub_;
+  shared_ptr<message_filters::Subscriber<sensor_msgs::CompressedImage>> att_sub_;
   SynchronizerImagePose sync_image_pose_;
-  SynchronizerImagePoseImage sync_image_pose_image;  
+  SynchronizerImagePoseCompressedImage sync_image_pose_compimage;  
   SynchronizerCloudPose sync_cloud_pose_;
 
   ros::Publisher map_local_pub_, map_local_inflate_pub_, esdf_pub_, map_all_pub_, unknown_pub_,
@@ -99,6 +111,8 @@ private:
   double visualization_truncate_height_, visualization_truncate_low_;
   bool show_esdf_time_, show_occ_time_;
   bool show_all_map_;
+  int p_max; // max priority to recover priority mask values
+
 
   // data
   // flags of map state

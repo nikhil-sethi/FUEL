@@ -16,6 +16,7 @@ using std::list;
 using std::pair;
 
 class RayCaster;
+class Diffuser;
 
 namespace fast_planner {
 class EDTEnvironment;
@@ -48,6 +49,7 @@ struct Frontier {
   // Path and cost from this cluster to other clusters
   list<vector<Vector3d>> paths_;
   list<double> costs_;
+  vector<float> gains_; // information gain diffused from priority map
 };
 
 class FrontierFinder {
@@ -55,7 +57,8 @@ public:
   FrontierFinder(const shared_ptr<EDTEnvironment>& edt, ros::NodeHandle& nh);
   ~FrontierFinder();
 
-  void searchFrontiers();
+  void removeOldFrontiers();
+  void searchNewFrontiers();
   void computeFrontiersToVisit();
 
   void getFrontiers(vector<vector<Vector3d>>& clusters);
@@ -71,13 +74,18 @@ public:
   void updateFrontierCostMatrix();
   void getFullCostMatrix(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw,
                          Eigen::MatrixXd& mat);
-  void getPathForTour(const Vector3d& pos, const vector<int>& frontier_ids, vector<Vector3d>& path);
+  void getPathForTour(const Vector3d& pos, const vector<uint8_t>& frontier_ids, vector<Vector3d>& path);
 
   void setNextFrontier(const int& id);
   bool isFrontierCovered();
   void wrapYaw(double& yaw);
 
   shared_ptr<PerceptionUtils> percep_utils_;
+  friend class ::Diffuser;
+  vector<Eigen::Vector3i> allNeighbors(const Eigen::Vector3i& voxel, int depth=1);
+  vector<char> frontier_flag_;
+  void setDiffuser(shared_ptr<Diffuser> diff_ptr){diffuser_ = diff_ptr;}
+  list<Frontier> frontiers_, dormant_frontiers_, tmp_frontiers_;
 
 private:
   void splitLargeFrontiers(list<Frontier>& frontiers);
@@ -94,7 +102,6 @@ private:
   bool isNearUnknown(const Vector3d& pos);
   vector<Eigen::Vector3i> sixNeighbors(const Eigen::Vector3i& voxel);
   vector<Eigen::Vector3i> tenNeighbors(const Eigen::Vector3i& voxel);
-  vector<Eigen::Vector3i> allNeighbors(const Eigen::Vector3i& voxel);
   bool isNeighborUnknown(const Eigen::Vector3i& voxel);
   void expandFrontier(const Eigen::Vector3i& first /* , const int& depth, const int& parent_id */);
 
@@ -110,13 +117,13 @@ private:
   void findViewpoints(const Vector3d& sample, const Vector3d& ftr_avg, vector<Viewpoint>& vps);
 
   // Data
-  vector<char> frontier_flag_;
-  list<Frontier> frontiers_, dormant_frontiers_, tmp_frontiers_;
+  
   vector<int> removed_ids_;
   list<Frontier>::iterator first_new_ftr_;
   Frontier next_frontier_;
 
   // Params
+  bool use_active_perception_;
   int cluster_min_;
   double cluster_size_xy_, cluster_size_z_;
   double candidate_rmax_, candidate_rmin_, candidate_dphi_, min_candidate_dist_,
@@ -128,6 +135,9 @@ private:
   // Utils
   shared_ptr<EDTEnvironment> edt_env_;
   unique_ptr<RayCaster> raycaster_;
+  shared_ptr<Diffuser> diffuser_;
+
+  float gamma;
 };
 
 }  // namespace fast_planner

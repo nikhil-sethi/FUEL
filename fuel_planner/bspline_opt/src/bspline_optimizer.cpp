@@ -53,6 +53,7 @@ void BsplineOptimizer::setParam(ros::NodeHandle& nh) {
   nh.param("manager/bspline_degree", bspline_degree_, 3);
 
   time_lb_ = -1;  // Not used by in most case
+  nlopt::srand(0);
 }
 
 void BsplineOptimizer::setEnvironment(const EDTEnvironment::Ptr& env) {
@@ -107,11 +108,11 @@ void BsplineOptimizer::setTimeLowerBound(const double& lb) {
   time_lb_ = lb;
 }
 
-void BsplineOptimizer::optimize(Eigen::MatrixXd& points, double& dt, const int& cost_function,
+int BsplineOptimizer::optimize(Eigen::MatrixXd& points, double& dt, const int& cost_function,
                                 const int& max_num_id, const int& max_time_id) {
   if (start_state_.empty()) {
     ROS_ERROR("Initial state undefined!");
-    return;
+    return -1;
   }
   control_points_ = points;
   knot_span_ = dt;
@@ -130,7 +131,7 @@ void BsplineOptimizer::optimize(Eigen::MatrixXd& points, double& dt, const int& 
   variable_num_ = optimize_time_ ? dim_ * point_num_ + 1 : dim_ * point_num_;
   if (variable_num_ <= 0) {
     ROS_ERROR("Empty varibale to optimization solver.");
-    return;
+    return -1;
   }
 
   pt_dist_ = 0.0;
@@ -154,15 +155,16 @@ void BsplineOptimizer::optimize(Eigen::MatrixXd& points, double& dt, const int& 
 
   comb_time = 0.0;
 
-  optimize();
-
+  nlopt::result res = optimize();
   points = control_points_;
   dt = knot_span_;
   start_state_.clear();
   time_lb_ = -1;
+
+  return res;
 }
 
-void BsplineOptimizer::optimize() {
+nlopt::result BsplineOptimizer::optimize() {
   // Optimize all control points and maybe knot span dt
   // Use NLopt solver
   nlopt::opt opt(nlopt::algorithm(isQuadratic() ? algorithm1_ : algorithm2_), variable_num_);
@@ -221,9 +223,10 @@ void BsplineOptimizer::optimize() {
   }
 
   auto t1 = ros::Time::now();
+  nlopt::result result = nlopt::FAILURE;
   try {
     double final_cost;
-    nlopt::result result = opt.optimize(q, final_cost);
+    result = opt.optimize(q, final_cost);
   } catch (std::exception& e) {
     cout << e.what() << endl;
   }
@@ -231,11 +234,11 @@ void BsplineOptimizer::optimize() {
     for (int j = 0; j < dim_; ++j)
       control_points_(i, j) = best_variable_[dim_ * i + j];
   if (optimize_time_) knot_span_ = best_variable_[variable_num_ - 1];
-
-  if (cost_function_ & MINTIME) {
-    std::cout << "Iter num: " << iter_num_ << ", time: " << (ros::Time::now() - t1).toSec()
-              << ", point num: " << point_num_ << ", comb time: " << comb_time << std::endl;
-  }
+  return result;
+  // if (cost_function_ & MINTIME) {
+  //   std::cout << "Iter num: " << iter_num_ << ", time: " << (ros::Time::now() - t1).toSec()
+  //             << ", point num: " << point_num_ << ", comb time: " << comb_time << std::endl;
+  // }
 
   // Deprecated
   // for (int i = order_; i < control_points_.rows(); ++i)

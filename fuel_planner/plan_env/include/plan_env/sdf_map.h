@@ -18,7 +18,10 @@ class Mat;
 }
 
 class RayCaster;
-class AttentionMap;
+class PriorityMap;
+class Diffuser;
+class ObjectFinder;
+class TargetPlanner;
 
 namespace fast_planner {
 struct MapParam;
@@ -32,7 +35,7 @@ public:
 
   enum OCCUPANCY { UNKNOWN, FREE, OCCUPIED };
 
-  void initMap(ros::NodeHandle& nh);
+  void initMap(MapROS* map_ros, ros::NodeHandle& nh);
   void inputPointCloud(const pcl::PointCloud<pcl::PointXYZI>& points, const int& point_num,
                        const Eigen::Vector3d& camera_pos);
 
@@ -53,6 +56,8 @@ public:
 
   float getAttention(const Eigen::Vector3i& id);
 
+  bool isNearUnknown(const Eigen::Vector3d& pos, double clearance);
+
   void setOccupied(const Eigen::Vector3d& pos, const int& occ = 1);
   int getInflateOccupancy(const Eigen::Vector3d& pos);
   int getInflateOccupancy(const Eigen::Vector3i& id);
@@ -68,10 +73,12 @@ public:
   void getUpdatedBox(Eigen::Vector3d& bmin, Eigen::Vector3d& bmax, bool reset = false);
   double getResolution();
   int getVoxelNum();
-  void processAttentionMap();
+  void processPriorityMap();
   void setParams(ros::NodeHandle& nh, std::string ns="");
-
+  void loadGTAttMap();
+  void closeFile();
   int buffer_size;
+  std::vector<float> diffusion_buffer_gt; // fill
 
 private:
   void clearAndInflateLocalMap();
@@ -83,11 +90,15 @@ private:
 
   unique_ptr<MapParam> mp_;
   unique_ptr<MapData> md_;
-  unique_ptr<MapROS> mr_;
+  shared_ptr<MapROS> mr_;
   unique_ptr<RayCaster> caster_;
 
   friend MapROS;
-  friend class ::AttentionMap; // in global namespace
+  friend class ::PriorityMap; // in global namespace
+  friend class ::Diffuser;
+  friend class ::ObjectFinder;
+  friend class ::TargetPlanner;
+
 
 public:
   typedef std::shared_ptr<SDFMap> Ptr;

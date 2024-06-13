@@ -17,13 +17,17 @@ plan_env
 bspline
 path_searching
 cv_bridge
+common
+sensor_model
+common_msgs
+# traj_utils
 )
 
 
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES active_perception
- CATKIN_DEPENDS plan_env bspline path_searching
+ CATKIN_DEPENDS plan_env bspline path_searching common
  DEPENDS system_lib
 )
 
@@ -41,6 +45,9 @@ add_library( active_perception
     src/frontier_finder.cpp
     src/graph_node.cpp
     src/perception_utils.cpp
+    src/diffuser.cpp
+    src/object_finder.cpp
+    src/target_planner.cpp
     )
 target_link_libraries( active_perception
     ${catkin_LIBRARIES} 

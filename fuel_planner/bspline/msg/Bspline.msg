@@ -8,3 +8,6 @@ geometry_msgs/Point[] pos_pts
 float64[] yaw_pts
 float64 yaw_dt
 
+bool waypoint_flag
+geometry_msgs/Point next_pos
+float64 next_yaw

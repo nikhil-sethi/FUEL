@@ -2,11 +2,13 @@
 #include <plan_manage/planner_manager.h>
 #include <exploration_manager/fast_exploration_manager.h>
 #include <traj_utils/planning_visualization.h>
-
+#include <active_perception/object_finder.h>
 #include <exploration_manager/fast_exploration_fsm.h>
 #include <exploration_manager/expl_data.h>
 #include <plan_env/edt_environment.h>
 #include <plan_env/sdf_map.h>
+#include <std_srvs/Trigger.h>
+#include "quadrotor_msgs/PositionCommand.h"
 
 using Eigen::Vector4d;
 
@@ -29,14 +31,14 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   planner_manager_ = expl_manager_->planner_manager_;
   state_ = EXPL_STATE::INIT;
   fd_->have_odom_ = false;
-  fd_->state_str_ = { "INIT", "WAIT_TRIGGER", "PLAN_TRAJ", "PUB_TRAJ", "EXEC_TRAJ", "FINISH" };
+  fd_->state_str_ = { "INIT", "WAIT_TRIGGER", "PLAN_TRAJ", "PUB_TRAJ", "EXEC_TRAJ", "FINISH" , "IDLE"};
   fd_->static_state_ = true;
   fd_->trigger_ = false;
 
   /* Ros sub, pub and timer */
   exec_timer_ = nh.createTimer(ros::Duration(0.01), &FastExplorationFSM::FSMCallback, this);
   safety_timer_ = nh.createTimer(ros::Duration(0.05), &FastExplorationFSM::safetyCallback, this);
-  frontier_timer_ = nh.createTimer(ros::Duration(0.5), &FastExplorationFSM::frontierCallback, this);
+  // frontier_timer_ = nh.createTimer(ros::Duration(0.5), &FastExplorationFSM::frontierCallback, this);
 
   trigger_sub_ =
       nh.subscribe("/waypoint_generator/waypoints", 1, &FastExplorationFSM::triggerCallback, this);
@@ -45,6 +47,14 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   replan_pub_ = nh.advertise<std_msgs::Empty>("/planning/replan", 10);
   new_pub_ = nh.advertise<std_msgs::Empty>("/planning/new", 10);
   bspline_pub_ = nh.advertise<bspline::Bspline>("/planning/bspline", 10);
+  pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("/planning/pos_cmd", 50);
+
+  metrics_client_ = nh.serviceClient<std_srvs::Trigger>("/finish_metrics_service");
+  px4ci_finish_client = nh.serviceClient<std_srvs::Trigger>("/px4_mission_finished_ext_cont");
+  disable_interface_client_ = nh.serviceClient<std_srvs::Trigger>("/px4_ext_cont_disable");
+
+  tries = 0;
+
 }
 
 void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
@@ -65,15 +75,54 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
     case WAIT_TRIGGER: {
       // Do nothing but wait for trigger
       ROS_WARN_THROTTLE(1.0, "wait for trigger.");
+      // thread vis_thread(&FastExplorationFSM::visualize, this);
+      // vis_thread.detach();
       break;
     }
 
     case FINISH: {
-      ROS_INFO_THROTTLE(1.0, "finish exploration.");
+
+        ROS_INFO_THROTTLE(1.0, "finish exploration.");
+
+        // calculate metrics for attention map
+        std_srvs::Trigger srv1;
+        // Send the request to trigger the service
+        bool res1 = metrics_client_.call(srv1);
+        if (res1) {
+            ROS_INFO("Metrics service triggered successfully");
+            // Handle the response if needed
+        } else {
+            ROS_ERROR("Failed to call metrics service");
+        }
+
+        // disable interface control loop
+        std_srvs::Trigger srv2;
+        bool res2 = px4ci_finish_client.call(srv2);
+        if (res2) {
+            ROS_INFO("Mission finish service triggered successfully");
+            // Handle the response if needed
+        } else {
+            ROS_ERROR("Failed to call px4ci_finish service");
+        }
+
+        // end mission, go to home
+        std_srvs::Trigger srv3;
+        bool res3 = disable_interface_client_.call(srv3);
+        if (res3) {
+            ROS_INFO("Disable control interface successful");
+            // Handle the response if needed
+        } else {
+            ROS_ERROR("Failed to call disable_interfac service");
+        }
+        transitState(WAIT_TRIGGER, "FSM");
+      
+      
       break;
     }
 
     case PLAN_TRAJ: {
+      // tries = 0;
+      std::cout<<"Current state: "<<fd_->odom_pos_.transpose()<<" "<<fd_->odom_yaw_<<std::endl;
       if (fd_->static_state_) {
         // Plan from static state (hover)
         fd_->start_pt_ = fd_->odom_pos_;
@@ -100,15 +149,23 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       int res = callExplorationPlanner();
       if (res == SUCCEED) {
         transitState(PUB_TRAJ, "FSM");
+        tries = 0;
       } else if (res == NO_FRONTIER) {
-        transitState(FINISH, "FSM");
-        fd_->static_state_ = true;
-        clearVisMarker();
-      } else if (res == FAIL) {
-        // Still in PLAN_TRAJ state, keep replanning
+        if (tries > 10) {
+          transitState(FINISH, "FSM");
+          fd_->static_state_ = true;
+          clearVisMarker();
+        }
+        tries +=1;
+
+      } else if (res == FAIL) { // Still in PLAN_TRAJ state, keep replanning
         ROS_WARN("plan fail");
         fd_->static_state_ = true;
       }
+      // else if (res==TRAJ_FAIL) // Trajectory planning failed, try position control
+      //   ROS_WARN("Trajectory failed. Switching to waypoint planning");
+      //   publish_cmd(expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
+        
       break;
     }
 
@@ -164,12 +221,12 @@ int FastExplorationFSM::callExplorationPlanner() {
 
   // int res = expl_manager_->rapidFrontier(fd_->start_pt_, fd_->start_vel_, fd_->start_yaw_[0],
   // classic_);
-
+  bspline::Bspline bspline;
   if (res == SUCCEED) {
     auto info = &planner_manager_->local_data_;
     info->start_time_ = (ros::Time::now() - time_r).toSec() > 0 ? ros::Time::now() : time_r;
 
-    bspline::Bspline bspline;
+    
     bspline.order = planner_manager_->pp_.bspline_degree_;
     bspline.start_time = info->start_time_;
     bspline.traj_id = info->traj_id_;
@@ -191,9 +248,35 @@ int FastExplorationFSM::callExplorationPlanner() {
       bspline.yaw_pts.push_back(yaw);
     }
     bspline.yaw_dt = info->yaw_traj_.getKnotSpan();
+    
+    fd_->newest_traj_ = bspline;
+  }
+  else if (res == TRAJ_FAIL){ // handle trajectory failures
+    ROS_WARN("trajectory failing. switch to waypoint");
+    bspline.waypoint_flag = true;
+    bspline.next_pos.x = expl_manager_->ed_->next_pos_(0);
+    bspline.next_pos.y = expl_manager_->ed_->next_pos_(1);
+    bspline.next_pos.z = expl_manager_->ed_->next_pos_(2);
+    bspline.next_yaw = expl_manager_->ed_->next_yaw_;
+    res = SUCCEED;
     fd_->newest_traj_ = bspline;
   }
   return res;
+}
+
+
+void FastExplorationFSM::publish_cmd(Eigen::Vector3d pos, double yaw){
+  quadrotor_msgs::PositionCommand cmd;
+  ros::Time time_now = ros::Time::now();
+  cmd.header.stamp = time_now;
+  cmd.position.x = pos(0);
+  cmd.position.y = pos(1);
+  cmd.position.z = pos(2);
+  cmd.yaw = yaw;
+  cmd.trajectory_flag = 0;
+  std::cout<<expl_manager_->ed_->next_yaw_<<" "<<yaw<<std::endl;
+
+  pos_cmd_pub.publish(cmd);
 }
 
 void FastExplorationFSM::visualize() {
@@ -222,15 +305,33 @@ void FastExplorationFSM::visualize() {
     // "frontier_boxes", i, 4);
   }
   last_ftr_num = ed_ptr->frontiers_.size();
-  // for (int i = 0; i < ed_ptr->dead_frontiers_.size(); ++i)
-  //   visualization_->drawCubes(ed_ptr->dead_frontiers_[i], 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier",
-  //                             i, 4);
-  // for (int i = ed_ptr->dead_frontiers_.size(); i < 5; ++i)
-  //   visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier", i, 4);
+  for (int i = 0; i < ed_ptr->dead_frontiers_.size(); ++i)
+    visualization_->drawCubes(ed_ptr->dead_frontiers_[i], 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier",
+                              i, 4);
+  for (int i = ed_ptr->dead_frontiers_.size(); i < 5; ++i)
+    visualization_->drawCubes({}, 0.1, Vector4d(0, 0, 0, 0.5), "dead_frontier", i, 4);
+
+
+    Eigen::Matrix<double, 4, 4> colormap;
+    // // jet colormap
+    colormap <<
+        0 ,0,255,1, // blue
+        0,255,0,1, // green
+        255,255,0,1, //yellow
+        255,0,0,1; // red
+    colormap = colormap/255;
 
   // Draw global top viewpoints info
-  visualization_->drawSpheres(ed_ptr->points_, 0.2, Vector4d(0, 0.5, 0, 1), "points", 0, 6);
-  visualization_->drawLines(ed_ptr->global_tour_, 0.07, Vector4d(0, 0.5, 0, 1), "global_tour", 0, 6);
+  std::vector<Eigen::Vector4d> expl_vpt_colors;
+  float min_expl_gain = 10; 
+  float max_expl_gain= 150;  
+  for (auto gain: expl_manager_->expl_priorities){
+    Eigen::Vector4d color = getColor(gain, min_expl_gain, max_expl_gain, colormap);
+    expl_vpt_colors.push_back(color);
+  }
+
+  visualization_->drawSpheres(ed_ptr->points_, 0.2, expl_vpt_colors, "exploration_points", 0, 6);
+  visualization_->drawLines(ed_ptr->global_tour_, 0.07, Vector4d(0.1, 0.1, 0.1, 1), "global_tour", 0, 6);
   visualization_->drawLines(ed_ptr->points_, ed_ptr->views_, 0.05, Vector4d(0, 1, 0.5, 1), "view", 0, 6);
   visualization_->drawLines(ed_ptr->points_, ed_ptr->averages_, 0.03, Vector4d(1, 0, 0, 1),
   "point-average", 0, 6);
@@ -260,6 +361,39 @@ void FastExplorationFSM::visualize() {
                               Vector4d(1, 1, 0, 1));
   // visualization_->drawSpheres(plan_data->kino_path_, 0.1, Vector4d(1, 0, 1, 1), "kino_path", 0, 0);
   // visualization_->drawLines(ed_ptr->path_next_goal_, 0.05, Vector4d(0, 1, 1, 1), "next_goal", 1, 6);
+
+    if (expl_manager_->use_object_vpts_){
+      int i=0;
+      for (Object& object: expl_manager_->object_finder->global_objects ){
+          visualization_->drawBox(object.centroid_, object.scale_, Eigen::Vector4d(0.5, 0, 1, 0.3), "box"+std::to_string(i), i, 7);
+          i++;
+      }
+
+
+      float min_gain = 10; 
+      float max_gain= 150;
+      // std::vector<Eigen::Vector3d> vpt_positions;
+      std::vector<Eigen::Vector4d> vpt_colors;
+        std::vector<Eigen::Vector3d> vpt_positions;
+        Eigen::Vector3d pos;
+        int k = 0;
+        
+        for (auto vpt: expl_manager_->target_vpts){
+          
+          pos(0) = vpt.position.x;
+          pos(1) = vpt.position.y;
+          pos(2) = vpt.position.z;
+            // vpt_positions.push_back(vpt.posToEigen());
+            vpt_positions.push_back(pos);
+            
+            Eigen::Vector4d color = getColor(expl_manager_->priorities[k], min_gain, max_gain, colormap);
+            vpt_colors.push_back(color);
+            k++;
+        }
+        if (!vpt_positions.empty()) visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "points_", 1, 6);
+
+      // }
+    }
 }
 
 void FastExplorationFSM::clearVisMarker() {
@@ -280,7 +414,8 @@ void FastExplorationFSM::frontierCallback(const ros::TimerEvent& e) {
   if (state_ == WAIT_TRIGGER || state_ == FINISH) {
     auto ft = expl_manager_->frontier_finder_;
     auto ed = expl_manager_->ed_;
-    ft->searchFrontiers();
+    ft->removeOldFrontiers();
+    ft->searchNewFrontiers();
     ft->computeFrontiersToVisit();
     ft->updateFrontierCostMatrix();
 

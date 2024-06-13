@@ -9,11 +9,16 @@
 #include <path_searching/topo_prm.h>
 
 #include <plan_env/edt_environment.h>
+#include <plan_env/map_ros.h>
 
 #include <active_perception/frontier_finder.h>
 #include <active_perception/heading_planner.h>
 
 #include <plan_manage/plan_container.hpp>
+
+#include <plan_env/priority_map.h>
+#include <active_perception/diffuser.h>
+
 
 #include <ros/ros.h>
 
@@ -31,13 +36,13 @@ public:
   bool kinodynamicReplan(const Eigen::Vector3d& start_pt, const Eigen::Vector3d& start_vel,
                          const Eigen::Vector3d& start_acc, const Eigen::Vector3d& end_pt,
                          const Eigen::Vector3d& end_vel, const double& time_lb = -1);
-  void planExploreTraj(const vector<Eigen::Vector3d>& tour, const Eigen::Vector3d& cur_vel,
+  int planExploreTraj(const vector<Eigen::Vector3d>& tour, const Eigen::Vector3d& cur_vel,
                        const Eigen::Vector3d& cur_acc, const double& time_lb = -1);
   bool planGlobalTraj(const Eigen::Vector3d& start_pos);
   bool topoReplan(bool collide);
 
   void planYaw(const Eigen::Vector3d& start_yaw);
-  void planYawExplore(const Eigen::Vector3d& start_yaw, const double& end_yaw, bool lookfwd,
+  int planYawExplore(const Eigen::Vector3d& start_yaw, const double& end_yaw, bool lookfwd,
                       const double& relax_time);
 
   void initPlanModules(ros::NodeHandle& nh);
@@ -56,11 +61,15 @@ public:
   EDTEnvironment::Ptr edt_environment_;
   unique_ptr<Astar> path_finder_;
   unique_ptr<TopologyPRM> topo_prm_;
+  shared_ptr<Diffuser> diffuser_;
+  shared_ptr<PriorityMap> att_map;
 
 private:
   /* main planning algorithms & modules */
+  shared_ptr<MapROS> _map_ros;
   shared_ptr<SDFMap> sdf_map_;
 
+  
   unique_ptr<KinodynamicAstar> kino_path_finder_;
   vector<BsplineOptimizer::Ptr> bspline_optimizers_;
 
@@ -95,9 +104,9 @@ public:
   void searchFrontier(const Eigen::Vector3d& p);
 
 private:
-  unique_ptr<FrontierFinder> frontier_finder_;
+  // shared_ptr<FrontierFinder> frontier_finder_;
   unique_ptr<HeadingPlanner> heading_planner_;
-  unique_ptr<VisibilityUtil> visib_util_;
+  // unique_ptr<VisibilityUtil> visib_util_;
 
   // Benchmark method, local exploration
 public:

@@ -4,7 +4,7 @@
 #include <Eigen/Eigen>
 #include <active_perception/traj_visibility.h>
 #include <ros/ros.h>
-
+#include <nlopt.hpp>
 // Gradient and elasitc band optimization
 
 // Input: a signed distance field and a sequence of points
@@ -36,7 +36,7 @@ public:
   /* main API */
   void setEnvironment(const shared_ptr<EDTEnvironment>& env);
   void setParam(ros::NodeHandle& nh);
-  void optimize(Eigen::MatrixXd& points, double& dt, const int& cost_function, const int& max_num_id,
+  int optimize(Eigen::MatrixXd& points, double& dt, const int& cost_function, const int& max_num_id,
                 const int& max_time_id);
 
   /* helper function */
@@ -53,7 +53,7 @@ public:
   void setViewConstraint(const ViewConstraint& vc);
   void enableDynamic(double time_start);
 
-  void optimize();
+  nlopt::result optimize();
 
   Eigen::MatrixXd getControlPoints();
   vector<Eigen::Vector3d> matrixToVectors(const Eigen::MatrixXd& ctrl_pts);

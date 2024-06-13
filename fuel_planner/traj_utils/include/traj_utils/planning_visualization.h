@@ -62,12 +62,17 @@ public:
   // new interface
   void fillBasicInfo(visualization_msgs::Marker& mk, const Eigen::Vector3d& scale,
                      const Eigen::Vector4d& color, const string& ns, const int& id, const int& shape);
+  void fillBasicInfo(visualization_msgs::Marker& mk, const Eigen::Vector3d& scale,
+                     const std::vector<Eigen::Vector4d>& colors, const string& ns, const int& id, const int& shape);
+
   void fillGeometryInfo(visualization_msgs::Marker& mk, const vector<Eigen::Vector3d>& list);
   void fillGeometryInfo(visualization_msgs::Marker& mk, const vector<Eigen::Vector3d>& list1,
                         const vector<Eigen::Vector3d>& list2);
 
   void drawSpheres(const vector<Eigen::Vector3d>& list, const double& scale,
                    const Eigen::Vector4d& color, const string& ns, const int& id, const int& pub_id);
+  void drawSpheres(const vector<Eigen::Vector3d>& list, const double& scale,
+                   const std::vector<Eigen::Vector4d>& colors, const string& ns, const int& id, const int& pub_id);
   void drawCubes(const vector<Eigen::Vector3d>& list, const double& scale, const Eigen::Vector4d& color,
                  const string& ns, const int& id, const int& pub_id);
   void drawLines(const vector<Eigen::Vector3d>& list1, const vector<Eigen::Vector3d>& list2,

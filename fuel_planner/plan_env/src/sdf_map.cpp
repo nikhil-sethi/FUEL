@@ -86,18 +86,49 @@ void SDFMap::setParams(ros::NodeHandle& nh, std::string ns){
   posToIndex(mp_->box_mind_, mp_->box_min_);
   posToIndex(mp_->box_maxd_, mp_->box_max_);
 
+  // diffusion_map_gt = new DiffusionMapGT;
+
+  diffusion_buffer_gt = std::vector<float>(buffer_size, 1);
+
 }
 
-void SDFMap::initMap(ros::NodeHandle& nh) {
+void SDFMap::loadGTAttMap(){
+    pcl::PointCloud<pcl::PointXYZI> cloud;
+
+    // Load PCD file
+    // std::string file = "/root/thesis_ws/src/thesis/sw/perception/attention_map/assets/attention_map_diffused_gt.pcd";
+    // std::string file = "/root/thesis_ws/src/thesis/sw/bringup/models/earthquake/earthquake_diffusion_map_gt.pcd";
+    std::string file = "/root/thesis_ws/src/thesis/sw/bringup/models/cave/diff_map_gt.pcd";
+    if (pcl::io::loadPCDFile<pcl::PointXYZI>(file, cloud) == -1)
+    {
+        ROS_ERROR("Couldn't read file cloud.pcd");
+        return;
+    }
+    ROS_INFO("Loaded attention map succesfully");
+
+    // update the buffer
+    Eigen::Vector3d pos;
+    Eigen::Vector3i idx;
+    for (auto& pt: cloud.points){
+      pos[0] = pt.x;
+      pos[1] = pt.y;
+      pos[2] = pt.z;
+      posToIndex(pos, idx);
+      int adr = toAddress(idx);
+      diffusion_buffer_gt[adr] = pt.intensity;
+    }
+
+}
+
+
+void SDFMap::initMap(MapROS* map_ros, ros::NodeHandle& nh) {
   // mp_.reset(new MapParam);
   // md_.reset(new MapData);
   setParams(nh);
-  mr_.reset(new MapROS);
+  mr_.reset(map_ros);
 
   // Initialize ROS wrapper
   mr_->setMap(this);
-  mr_->node_ = nh;
-  mr_->init();
 
   caster_.reset(new RayCaster);
   caster_->setParams(mp_->resolution_, mp_->map_origin_);
@@ -105,6 +136,10 @@ void SDFMap::initMap(ros::NodeHandle& nh) {
     md_->all_min_[i] = 1000000;
     md_->all_max_[i] = -1000000;
   }
+
+  loadGTAttMap();
+
+
 }
 
 void SDFMap::resetBuffer() {
@@ -271,6 +306,8 @@ void SDFMap::setCacheOccupancy(const int& adr, const int& occ) {
   //   md_->cache_voxel_.push(adr);
 }
 
+void SDFMap::closeFile(){mr_->entropy_file.close();}
+
 void SDFMap::inputPointCloud(
     const pcl::PointCloud<pcl::PointXYZI>& points, const int& point_num,
     const Eigen::Vector3d& camera_pos) {
@@ -300,7 +337,7 @@ void SDFMap::inputPointCloud(
       length = (pt_w - camera_pos).norm();
       if (length > mp_->max_ray_length_)
         pt_w = (pt_w - camera_pos) / length * mp_->max_ray_length_ + camera_pos;
-      if (pt_w[2] < 0.1) continue;
+      if (pt_w[2] < 0.0) continue;
       tmp_flag = 0;
     } else {
       length = (pt_w - camera_pos).norm();
@@ -553,5 +590,18 @@ double SDFMap::getDistWithGrad(const Eigen::Vector3d& pos, Eigen::Vector3d& grad
 
   return dist;
 }
+
+bool SDFMap::isNearUnknown(const Eigen::Vector3d& pos, double clearance) {
+  const int vox_num = floor(clearance /  mp_->resolution_);
+  for (int x = -vox_num; x <= vox_num; ++x)
+    for (int y = -vox_num; y <= vox_num; ++y)
+      for (int z = -1; z <= 1; ++z) {
+        Eigen::Vector3d vox;
+        vox << pos[0] + x *  mp_->resolution_, pos[1] + y *  mp_->resolution_, pos[2] + z *  mp_->resolution_;
+        if (getOccupancy(vox) == UNKNOWN) return true;
+      }
+  return false;
+}
+
 }  // namespace fast_planner
 // SDFMap

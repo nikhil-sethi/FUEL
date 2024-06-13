@@ -6,6 +6,7 @@
 #include <utility>
 
 #include <plan_env/obj_predictor.h>
+#include <plan_env/priority_map.h>
 
 using std::cout;
 using std::endl;
@@ -34,9 +35,11 @@ public:
   }
 
   shared_ptr<SDFMap> sdf_map_;
+  // shared_ptr<PriorityMap> _att_map;
 
   void init();
   void setMap(shared_ptr<SDFMap>& map);
+  void setPriorityMap(shared_ptr<PriorityMap>& att_map);
   void setObjPrediction(ObjPrediction prediction);
   void setObjScale(ObjScale scale);
   void evaluateEDTWithGrad(const Eigen::Vector3d& pos, double time, double& dist, Eigen::Vector3d& grad);

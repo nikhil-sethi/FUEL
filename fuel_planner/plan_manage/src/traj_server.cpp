@@ -7,6 +7,9 @@
 #include <ros/ros.h>
 #include <poly_traj/polynomial_traj.h>
 #include <active_perception/perception_utils.h>
+#include <tf/transform_datatypes.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <common_msgs/float64List.h>
 
 #include <plan_manage/backward.hpp>
 namespace backward {
@@ -17,7 +20,7 @@ using fast_planner::Polynomial;
 using fast_planner::PolynomialTraj;
 using fast_planner::PerceptionUtils;
 
-ros::Publisher cmd_vis_pub, pos_cmd_pub, traj_pub;
+ros::Publisher cmd_vis_pub, pos_cmd_pub, traj_pub, traj_info_pub;
 nav_msgs::Odometry odom;
 quadrotor_msgs::PositionCommand cmd;
 
@@ -27,6 +30,10 @@ double traj_duration_;
 ros::Time start_time_;
 int traj_id_;
 int pub_traj_id_;
+
+Eigen::Vector3d next_pos;
+double next_yaw;
+bool waypoint_flag;
 
 shared_ptr<PerceptionUtils> percep_utils_;
 
@@ -207,14 +214,25 @@ void visCallback(const ros::TimerEvent& e) {
   // 1),
   //                      1);
 }
-
+void cmdCallback(const ros::TimerEvent& e);
 void bsplineCallback(const bspline::BsplineConstPtr& msg) {
+  if (msg->waypoint_flag){
+    ROS_WARN("Switch to waypoint");
+    waypoint_flag = true;
+    
+    next_pos(0) = msg->next_pos.x;
+    next_pos(1) = msg->next_pos.y;
+    next_pos(2) = msg->next_pos.z;
+
+    next_yaw = msg->next_yaw;
+    return;
+  }
+
   // Received traj should have ascending traj_id
   if (msg->traj_id <= traj_id_) {
     ROS_ERROR("out of order bspline.");
     return;
   }
-
   // Parse the msg
   Eigen::MatrixXd pos_pts(msg->pos_pts.size(), 3);
   Eigen::VectorXd knots(msg->knots.size());
@@ -254,6 +272,7 @@ void bsplineCallback(const bspline::BsplineConstPtr& msg) {
   }
 }
 
+
 void cmdCallback(const ros::TimerEvent& e) {
   // No publishing before receive traj data
   if (!receive_traj_) return;
@@ -262,33 +281,45 @@ void cmdCallback(const ros::TimerEvent& e) {
   double t_cur = (time_now - start_time_).toSec();
   Eigen::Vector3d pos, vel, acc, jer;
   double yaw, yawdot;
+  int trajectory_flag;
 
-  if (t_cur < traj_duration_ && t_cur >= 0.0) {
-    // Current time within range of planned traj
-    pos = traj_[0].evaluateDeBoorT(t_cur);
-    vel = traj_[1].evaluateDeBoorT(t_cur);
-    acc = traj_[2].evaluateDeBoorT(t_cur);
-    yaw = traj_[3].evaluateDeBoorT(t_cur)[0];
-    yawdot = traj_[4].evaluateDeBoorT(t_cur)[0];
-    jer = traj_[5].evaluateDeBoorT(t_cur);
-  } else if (t_cur >= traj_duration_) {
-    // Current time exceed range of planned traj
-    // keep publishing the final position and yaw
-    pos = traj_[0].evaluateDeBoorT(traj_duration_);
-    vel.setZero();
-    acc.setZero();
-    yaw = traj_[3].evaluateDeBoorT(traj_duration_)[0];
-    yawdot = 0.0;
+  if (!waypoint_flag){
+    trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
+    if (t_cur < traj_duration_ && t_cur >= 0.0) {
+      // Current time within range of planned traj
+      pos = traj_[0].evaluateDeBoorT(t_cur);
+      vel = traj_[1].evaluateDeBoorT(t_cur);
+      acc = traj_[2].evaluateDeBoorT(t_cur);
+      yaw = traj_[3].evaluateDeBoorT(t_cur)[0];
+      yawdot = traj_[4].evaluateDeBoorT(t_cur)[0];
+      jer = traj_[5].evaluateDeBoorT(t_cur);
+    } else if (t_cur >= traj_duration_) {
+      // Current time exceed range of planned traj
+      // keep publishing the final position and yaw
+      pos = traj_[0].evaluateDeBoorT(traj_duration_);
+      vel.setZero();
+      acc.setZero();
+      yaw = traj_[3].evaluateDeBoorT(traj_duration_)[0];
+      yawdot = 0.0;
 
-    // Report info of the whole flight
-    double len = calcPathLength(traj_cmd_);
-    double flight_t = (end_time - start_time).toSec();
-    ROS_WARN_THROTTLE(2, "flight time: %lf, path length: %lf, mean vel: %lf, energy is: % lf ", flight_t,
-                      len, len / flight_t, energy);
-  } else {
-    cout << "[Traj server]: invalid time." << endl;
+      // Report info of the whole flight
+      double len = calcPathLength(traj_cmd_);
+      double flight_t = (end_time - start_time).toSec();
+      ROS_WARN_THROTTLE(2, "flight time: %lf, path length: %lf, mean vel: %lf, energy is: % lf ", flight_t,
+                        len, len / flight_t, energy);
+    } else {
+      cout << "[Traj server]: invalid time." << endl;
+    }
   }
-
+  else{ //waypoint based following
+    pos = next_pos;
+    yaw = next_yaw;
+    vel = Eigen::Vector3d::Zero();
+    acc = Eigen::Vector3d::Zero();
+    yawdot = 0;
+    trajectory_flag = 0;
+    waypoint_flag = false;
+  }
   if (isLoopCorrection) {
     pos = R_loop.transpose() * (pos - T_loop);
     vel = R_loop.transpose() * vel;
@@ -301,6 +332,7 @@ void cmdCallback(const ros::TimerEvent& e) {
 
   cmd.header.stamp = time_now;
   cmd.trajectory_id = traj_id_;
+  cmd.trajectory_flag = trajectory_flag;
   cmd.position.x = pos(0);
   cmd.position.y = pos(1);
   cmd.position.z = pos(2);
@@ -340,6 +372,22 @@ void cmdCallback(const ros::TimerEvent& e) {
 
   // if (traj_cmd_.size() > 100000)
   //   traj_cmd_.erase(traj_cmd_.begin(), traj_cmd_.begin() + 1000);
+}
+
+void trajInfoCallback(const ros::TimerEvent e){
+  if (!receive_traj_) return;
+
+  // publish trajectory information for metrics
+  double path_length = calcPathLength(traj_cmd_);
+  double flight_time = (end_time - start_time).toSec();
+
+  common_msgs::float64List traj_info_msg;
+  traj_info_msg.header.stamp = ros::Time::now();
+  traj_info_msg.data.push_back(path_length);
+  traj_info_msg.data.push_back(flight_time);
+  traj_info_msg.data.push_back(energy);
+
+  traj_info_pub.publish(traj_info_msg);
 }
 
 void test() {
@@ -447,13 +495,17 @@ int main(int argc, char** argv) {
   cmd_vis_pub = node.advertise<visualization_msgs::Marker>("planning/position_cmd_vis", 10);
   pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
   traj_pub = node.advertise<visualization_msgs::Marker>("planning/travel_traj", 10);
+  traj_info_pub = node.advertise<common_msgs::float64List>("/data/trajectory_info", 10);
 
-  ros::Timer cmd_timer = node.createTimer(ros::Duration(0.01), cmdCallback);
+  ros::Timer cmd_timer = node.createTimer(ros::Duration(0.05), cmdCallback);
+  ros::Timer traj_info_timer = node.createTimer(ros::Duration(0.1), trajInfoCallback);
   ros::Timer vis_timer = node.createTimer(ros::Duration(0.25), visCallback);
 
   nh.param("traj_server/pub_traj_id", pub_traj_id_, -1);
   nh.param("fsm/replan_time", replan_time_, 0.1);
   nh.param("loop_correction/isLoopCorrection", isLoopCorrection, false);
+
+  geometry_msgs::PoseStamped init_pose  = *(ros::topic::waitForMessage<geometry_msgs::PoseStamped>("/mavros/vision_pose/pose", nh));
 
   Eigen::Vector3d init_pos;
   nh.param("traj_server/init_x", init_pos[0], 0.0);
@@ -470,12 +522,14 @@ int main(int argc, char** argv) {
   std::cout << start_time.toSec() << std::endl;
   std::cout << end_time.toSec() << std::endl;
 
+  tf::Quaternion quat(init_pose.pose.orientation.x, init_pose.pose.orientation.y, init_pose.pose.orientation.z, init_pose.pose.orientation.w);
+
   cmd.header.stamp = ros::Time::now();
   cmd.header.frame_id = "world";
   cmd.trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
   cmd.trajectory_id = traj_id_;
-  cmd.position.x = init_pos[0];
-  cmd.position.y = init_pos[1];
+  cmd.position.x = init_pose.pose.position.x;
+  cmd.position.y = init_pose.pose.position.y;
   cmd.position.z = init_pos[2];
   cmd.velocity.x = 0.0;
   cmd.velocity.y = 0.0;
@@ -483,7 +537,12 @@ int main(int argc, char** argv) {
   cmd.acceleration.x = 0.0;
   cmd.acceleration.y = 0.0;
   cmd.acceleration.z = 0.0;
-  cmd.yaw = 0.0;
+
+  double yaw, pitch, roll;
+
+  tf::Matrix3x3 mat(quat);
+  mat.getRPY(roll, pitch, yaw);
+  cmd.yaw = yaw;
   cmd.yaw_dot = 0.0;
 
   percep_utils_.reset(new PerceptionUtils(nh));

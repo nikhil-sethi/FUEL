@@ -23,6 +23,9 @@ find_package(catkin REQUIRED COMPONENTS
   traj_utils
   active_perception
   cv_bridge
+  tf
+  geometry_msgs
+  common_msgs
 )
 
 
@@ -40,22 +43,22 @@ include_directories(
 )
 
 
-add_executable(fast_planner_node
-  src/fast_planner_node.cpp 
-  src/kino_replan_fsm.cpp
-  src/topo_replan_fsm.cpp
-  test/local_explore_fsm.cpp
-  src/planner_manager.cpp
-  src/planner_manager_dev.cpp
-  )
-target_link_libraries(fast_planner_node 
-  ${catkin_LIBRARIES}
-  -ldw
-  )
+# add_executable(fast_planner_node
+  # src/fast_planner_node.cpp 
+  # src/kino_replan_fsm.cpp
+  # src/topo_replan_fsm.cpp
+  # test/local_explore_fsm.cpp
+  # src/planner_manager.cpp
+  # src/planner_manager_dev.cpp
+  # )
+# target_link_libraries(fast_planner_node 
+#   ${catkin_LIBRARIES}
+#   -ldw
+#   )
 
 add_library(plan_manage 
   src/planner_manager.cpp
-  src/planner_manager_dev.cpp
+  # src/planner_manager_dev.cpp
   )
 target_link_libraries(plan_manage ${catkin_LIBRARIES})
 
