@@ -78,6 +78,7 @@ public:
   void loadGTAttMap();
   void closeFile();
   int buffer_size;
+  std::vector<float> diffusion_buffer_gt; // fill
 
 private:
   void clearAndInflateLocalMap();
@@ -97,7 +98,6 @@ private:
   friend class ::Diffuser;
   friend class ::ObjectFinder;
   friend class ::TargetPlanner;
-  std::vector<float> attention_buffer_gt;
 
 
 public:

@@ -12,9 +12,9 @@ void EDTEnvironment::setMap(shared_ptr<SDFMap>& map) {
   resolution_inv_ = 1 / sdf_map_->getResolution();
 }
 
-void EDTEnvironment::setPriorityMap(shared_ptr<PriorityMap>& att_map) {
-  this->_att_map = att_map;
-}
+// void EDTEnvironment::setPriorityMap(shared_ptr<PriorityMap>& att_map) {
+//   this->_att_map = att_map;
+// }
 
 void EDTEnvironment::setObjPrediction(ObjPrediction prediction) {
   this->obj_prediction_ = prediction;

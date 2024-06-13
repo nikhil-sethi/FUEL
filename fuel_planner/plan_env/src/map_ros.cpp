@@ -44,6 +44,8 @@ void MapROS::init(ros::NodeHandle& nh) {
   nh.param("map_ros/show_all_map", show_all_map_, false);
   nh.param("map_ros/frame_id", frame_id_, string("world"));
 
+  nh.param("priority_map/pmax", p_max, 5);
+
   proj_points_.resize(640 * 480 / (skip_pixel_ * skip_pixel_));
   point_cloud_.points.resize(640 * 480 / (skip_pixel_ * skip_pixel_));
   // proj_points_.reserve(640 * 480 / map_->mp_->skip_pixel_ / map_->mp_->skip_pixel_);
@@ -102,8 +104,10 @@ void MapROS::init(ros::NodeHandle& nh) {
   att_image_.reset(new cv::Mat(480,848, CV_8UC1));
   (*att_image_).setTo(cv::Scalar::all(0));
 
-  occ_pub_ = nh.advertise<common_msgs::uint8List>("/occupancy_buffer/", 10);
-  occ_inflate_pub_ = nh.advertise<common_msgs::uint8List>("/occupancy_buffer_inflate/", 10);
+  entropy_pub = nh.advertise<common_msgs::Float64Stamped>("/data/weighted_entropy", 10);
+
+  // occ_pub_ = nh.advertise<common_msgs::uint8List>("/occupancy_buffer/", 10);
+  // occ_inflate_pub_ = nh.advertise<common_msgs::uint8List>("/occupancy_buffer_inflate/", 10);
   
   // occupancy_buffer_light = vector<uint8_t>(map_->buffer_size, 0); 
   // occ_timer_ = nh.createTimer(ros::Duration(0.05), &MapROS::occupancyTimer, this);
@@ -114,11 +118,6 @@ void MapROS::init(ros::NodeHandle& nh) {
   // current date/time based on current system
   time_t now = time(0);
    
-  // convert now to string form
-  std::string dt = ctime(&now);
-  std::string filename = "/root/entropy_" + dt + ".csv";
-  entropy_file.open(filename,  std::fstream::in | std::fstream::out | std::fstream::app);
-  entropy_file<<"time,entropy \n";
 }
 
 void MapROS::visCallback(const ros::TimerEvent& e) {
@@ -243,7 +242,7 @@ void MapROS::proessDepthImage() {
       depth = (*row_ptr) * inv_factor;
       row_ptr = row_ptr + skip_pixel_;
         // if (attention_needs_update_){
-      attention = 5*att_row_ptr[u]/(255.0f);
+      attention = p_max*att_row_ptr[u]/(255.0f);
       //  }
       // // filter depth
       // if (depth > 0.01)
@@ -603,13 +602,16 @@ void MapROS::metricsTimer(const ros::TimerEvent& event){
   float entropy=0;
   for (int i=0; i<map_->buffer_size; i++){
     float prob = (map_->getOccupancy(i)==SDFMap::UNKNOWN? 0.5:1);
-    float weight = map_->attention_buffer_gt[i];
+    float weight = map_->diffusion_buffer_gt[i];
     entropy += weight*prob*(-log2(prob));
     // std::cout<<i <<" ";
   }
-  entropy_file<< ros::Time::now() <<","<< entropy<<"\n";
+  // entropy_file<< ros::Time::now() <<","<< entropy<<"\n";
   // ROS_ERROR("Entropy: %f", entropy);
-
+  common_msgs::Float64Stamped msg;
+  msg.header.stamp = ros::Time::now();
+  msg.data = entropy;
+  entropy_pub.publish(msg);
 }
 
 

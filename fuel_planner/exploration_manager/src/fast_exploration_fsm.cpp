@@ -8,6 +8,7 @@
 #include <plan_env/edt_environment.h>
 #include <plan_env/sdf_map.h>
 #include <std_srvs/Trigger.h>
+#include "quadrotor_msgs/PositionCommand.h"
 
 using Eigen::Vector4d;
 
@@ -46,8 +47,9 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   replan_pub_ = nh.advertise<std_msgs::Empty>("/planning/replan", 10);
   new_pub_ = nh.advertise<std_msgs::Empty>("/planning/new", 10);
   bspline_pub_ = nh.advertise<bspline::Bspline>("/planning/bspline", 10);
+  pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("/planning/pos_cmd", 50);
 
-  metrics_client_ = nh.serviceClient<std_srvs::Trigger>("/planning/metrics");
+  metrics_client_ = nh.serviceClient<std_srvs::Trigger>("/finish_metrics_service");
   px4ci_finish_client = nh.serviceClient<std_srvs::Trigger>("/px4_mission_finished_ext_cont");
   disable_interface_client_ = nh.serviceClient<std_srvs::Trigger>("/px4_ext_cont_disable");
 
@@ -112,7 +114,6 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
         } else {
             ROS_ERROR("Failed to call disable_interfac service");
         }
-        expl_manager_->getSDFMapPtr()->closeFile();
         transitState(WAIT_TRIGGER, "FSM");
       
       
@@ -121,6 +122,7 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
 
     case PLAN_TRAJ: {
       // tries = 0;
+      std::cout<<"Current state: "<<fd_->odom_pos_.transpose()<<" "<<fd_->odom_yaw_<<std::endl;
       if (fd_->static_state_) {
         // Plan from static state (hover)
         fd_->start_pt_ = fd_->odom_pos_;
@@ -156,11 +158,14 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
         }
         tries +=1;
 
-      } else if (res == FAIL) {
-        // Still in PLAN_TRAJ state, keep replanning
+      } else if (res == FAIL) { // Still in PLAN_TRAJ state, keep replanning
         ROS_WARN("plan fail");
         fd_->static_state_ = true;
       }
+      // else if (res==TRAJ_FAIL) // Trajectory planning failed, try position control
+      //   ROS_WARN("Trajectory failed. Switching to waypoint planning");
+      //   publish_cmd(expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
+        
       break;
     }
 
@@ -216,12 +221,12 @@ int FastExplorationFSM::callExplorationPlanner() {
 
   // int res = expl_manager_->rapidFrontier(fd_->start_pt_, fd_->start_vel_, fd_->start_yaw_[0],
   // classic_);
-
+  bspline::Bspline bspline;
   if (res == SUCCEED) {
     auto info = &planner_manager_->local_data_;
     info->start_time_ = (ros::Time::now() - time_r).toSec() > 0 ? ros::Time::now() : time_r;
 
-    bspline::Bspline bspline;
+    
     bspline.order = planner_manager_->pp_.bspline_degree_;
     bspline.start_time = info->start_time_;
     bspline.traj_id = info->traj_id_;
@@ -243,9 +248,35 @@ int FastExplorationFSM::callExplorationPlanner() {
       bspline.yaw_pts.push_back(yaw);
     }
     bspline.yaw_dt = info->yaw_traj_.getKnotSpan();
+    
+    fd_->newest_traj_ = bspline;
+  }
+  else if (res == TRAJ_FAIL){ // handle trajectory failures
+    ROS_WARN("trajectory failing. switch to waypoint");
+    bspline.waypoint_flag = true;
+    bspline.next_pos.x = expl_manager_->ed_->next_pos_(0);
+    bspline.next_pos.y = expl_manager_->ed_->next_pos_(1);
+    bspline.next_pos.z = expl_manager_->ed_->next_pos_(2);
+    bspline.next_yaw = expl_manager_->ed_->next_yaw_;
+    res = SUCCEED;
     fd_->newest_traj_ = bspline;
   }
   return res;
+}
+
+
+void FastExplorationFSM::publish_cmd(Eigen::Vector3d pos, double yaw){
+  quadrotor_msgs::PositionCommand cmd;
+  ros::Time time_now = ros::Time::now();
+  cmd.header.stamp = time_now;
+  cmd.position.x = pos(0);
+  cmd.position.y = pos(1);
+  cmd.position.z = pos(2);
+  cmd.yaw = yaw;
+  cmd.trajectory_flag = 0;
+  std::cout<<expl_manager_->ed_->next_yaw_<<" "<<yaw<<std::endl;
+
+  pos_cmd_pub.publish(cmd);
 }
 
 void FastExplorationFSM::visualize() {
@@ -331,38 +362,38 @@ void FastExplorationFSM::visualize() {
   // visualization_->drawSpheres(plan_data->kino_path_, 0.1, Vector4d(1, 0, 1, 1), "kino_path", 0, 0);
   // visualization_->drawLines(ed_ptr->path_next_goal_, 0.05, Vector4d(0, 1, 1, 1), "next_goal", 1, 6);
 
-
-    int i=0;
-    for (Object& object: expl_manager_->object_finder->global_objects ){
-        visualization_->drawBox(object.centroid_, object.scale_, Eigen::Vector4d(0.5, 0, 1, 0.3), "box"+std::to_string(i), i, 7);
-        i++;
-    }
-
-
-    float min_gain = 10; 
-    float max_gain= 150;
-    // std::vector<Eigen::Vector3d> vpt_positions;
-    std::vector<Eigen::Vector4d> vpt_colors;
-      std::vector<Eigen::Vector3d> vpt_positions;
-      Eigen::Vector3d pos;
-      int k = 0;
-      
-      for (auto vpt: expl_manager_->target_vpts){
-        
-        pos(0) = vpt.position.x;
-        pos(1) = vpt.position.y;
-        pos(2) = vpt.position.z;
-          // vpt_positions.push_back(vpt.posToEigen());
-          vpt_positions.push_back(pos);
-          
-          Eigen::Vector4d color = getColor(expl_manager_->priorities[k], min_gain, max_gain, colormap);
-          vpt_colors.push_back(color);
-          k++;
+    if (expl_manager_->use_object_vpts_){
+      int i=0;
+      for (Object& object: expl_manager_->object_finder->global_objects ){
+          visualization_->drawBox(object.centroid_, object.scale_, Eigen::Vector4d(0.5, 0, 1, 0.3), "box"+std::to_string(i), i, 7);
+          i++;
       }
-      if (!vpt_positions.empty()) visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "points_", 1, 6);
 
-    // }
 
+      float min_gain = 10; 
+      float max_gain= 150;
+      // std::vector<Eigen::Vector3d> vpt_positions;
+      std::vector<Eigen::Vector4d> vpt_colors;
+        std::vector<Eigen::Vector3d> vpt_positions;
+        Eigen::Vector3d pos;
+        int k = 0;
+        
+        for (auto vpt: expl_manager_->target_vpts){
+          
+          pos(0) = vpt.position.x;
+          pos(1) = vpt.position.y;
+          pos(2) = vpt.position.z;
+            // vpt_positions.push_back(vpt.posToEigen());
+            vpt_positions.push_back(pos);
+            
+            Eigen::Vector4d color = getColor(expl_manager_->priorities[k], min_gain, max_gain, colormap);
+            vpt_colors.push_back(color);
+            k++;
+        }
+        if (!vpt_positions.empty()) visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "points_", 1, 6);
+
+      // }
+    }
 }
 
 void FastExplorationFSM::clearVisMarker() {

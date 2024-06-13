@@ -36,13 +36,13 @@ public:
   bool kinodynamicReplan(const Eigen::Vector3d& start_pt, const Eigen::Vector3d& start_vel,
                          const Eigen::Vector3d& start_acc, const Eigen::Vector3d& end_pt,
                          const Eigen::Vector3d& end_vel, const double& time_lb = -1);
-  void planExploreTraj(const vector<Eigen::Vector3d>& tour, const Eigen::Vector3d& cur_vel,
+  int planExploreTraj(const vector<Eigen::Vector3d>& tour, const Eigen::Vector3d& cur_vel,
                        const Eigen::Vector3d& cur_acc, const double& time_lb = -1);
   bool planGlobalTraj(const Eigen::Vector3d& start_pos);
   bool topoReplan(bool collide);
 
   void planYaw(const Eigen::Vector3d& start_yaw);
-  void planYawExplore(const Eigen::Vector3d& start_yaw, const double& end_yaw, bool lookfwd,
+  int planYawExplore(const Eigen::Vector3d& start_yaw, const double& end_yaw, bool lookfwd,
                       const double& relax_time);
 
   void initPlanModules(ros::NodeHandle& nh);

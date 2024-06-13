@@ -35,7 +35,7 @@ public:
   }
 
   shared_ptr<SDFMap> sdf_map_;
-  shared_ptr<PriorityMap> _att_map;
+  // shared_ptr<PriorityMap> _att_map;
 
   void init();
   void setMap(shared_ptr<SDFMap>& map);

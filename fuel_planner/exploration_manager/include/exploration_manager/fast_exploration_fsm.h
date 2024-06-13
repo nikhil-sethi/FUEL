@@ -49,7 +49,7 @@ private:
   ros::NodeHandle node_;
   ros::Timer exec_timer_, safety_timer_, vis_timer_, frontier_timer_;
   ros::Subscriber trigger_sub_, odom_sub_;
-  ros::Publisher replan_pub_, new_pub_, bspline_pub_;
+  ros::Publisher replan_pub_, new_pub_, bspline_pub_, pos_cmd_pub;
   ros::ServiceClient metrics_client_, px4ci_finish_client, disable_interface_client_;
 
   /* helper functions */
@@ -64,6 +64,7 @@ private:
   void odometryCallback(const nav_msgs::OdometryConstPtr& msg);
   void visualize();
   void clearVisMarker();
+  void publish_cmd(Eigen::Vector3d pos, double yaw);
 
 public:
   FastExplorationFSM(/* args */) {

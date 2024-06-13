@@ -26,6 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_srvs
   common_msgs
   sensor_model
+  quadrotor_msgs
   target_search
 )
 

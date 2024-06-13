@@ -44,21 +44,11 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   edt_environment_ = planner_manager_->edt_environment_;
   sdf_map_ = edt_environment_->sdf_map_;
   frontier_finder_.reset(new FrontierFinder(edt_environment_, nh));
-  
-  object_finder.reset(new ObjectFinder(nh));
-  object_finder->setPriorityMap(planner_manager_->att_map);
-  object_finder->setSDFMap(sdf_map_);
 
   // view_finder_.reset(new ViewFinder(edt_environment_, nh));
   planner_manager_->diffuser_->setFrontierFinder(frontier_finder_);
   frontier_finder_->setDiffuser(planner_manager_->diffuser_);
 
-  target_planner_.reset(new TargetPlanner);
-  target_planner_->setObjectFinder(object_finder);
-  target_planner_->setFrontierFinder(frontier_finder_);
-  target_planner_->setDiffusionMap(planner_manager_->diffuser_);
-  target_planner_->setSDFMap(sdf_map_);
-  target_planner_->init(nh);
 
   ed_.reset(new ExplorationData);
   ep_.reset(new ExplorationParam);
@@ -77,9 +67,25 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   nh.param("exploration/ydd", ViewNode::ydd_, -1.0);
   nh.param("exploration/w_dir", ViewNode::w_dir_, -1.0);
 
-  nh.param("/use_active_perception", use_active_perception_, false);
-  nh.param("/use_semantic_search", use_semantic_search_, false);
-  nh.param("/use_lkh", use_lkh_, false);
+  nh.param("/use_object_vpts", use_object_vpts_, false);
+  // nh.param("/use_semantic_search", use_semantic_search_, false);
+  nh.param("/use_motsp", use_motsp_, false);
+  nh.param("use_diffusion", use_diffusion_, false);
+  nh.param("use_greedy_search", use_greedy_search, false);
+
+  if (use_object_vpts_){
+    object_finder.reset(new ObjectFinder(nh));
+    object_finder->setPriorityMap(planner_manager_->att_map);
+    object_finder->setSDFMap(sdf_map_);
+
+    target_planner_.reset(new TargetPlanner);
+    target_planner_->setObjectFinder(object_finder);
+    target_planner_->setFrontierFinder(frontier_finder_);
+    target_planner_->setDiffusionMap(planner_manager_->diffuser_);
+    target_planner_->setSDFMap(sdf_map_);
+    target_planner_->init(nh);
+  }
+
 
   ViewNode::astar_.reset(new Astar);
   ViewNode::astar_->init(nh, edt_environment_);
@@ -146,7 +152,8 @@ int FastExplorationManager::planExploreMotion(
   frontier_finder_->searchNewFrontiers();
 
   // diffusion
-  planner_manager_->diffuser_->diffusionTimer(ros::TimerEvent());
+  if (use_diffusion_)
+    planner_manager_->diffuser_->diffusionTimer(ros::TimerEvent());
 
   double frontier_time = (ros::Time::now() - t1).toSec();
   t1 = ros::Time::now();
@@ -176,26 +183,42 @@ int FastExplorationManager::planExploreMotion(
       double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
       next_yaw = std::atan2(siny_cosp, cosy_cosp);    
   }
-  else if (use_active_perception_ && !target_vpts.empty()){
+  else if (use_object_vpts_ && !target_vpts.empty()){
     int num_targets_vpts = target_vpts.size();
     // greedy TODO change this to viewpoint cost to account for yaw as well
     // find the closest viewpoint to current position
-    if (num_targets_vpts == 1 || ts_type==TARGET_SEARCH::GREEDY){
-      double min_dist = 10000.0;
-      for (auto& vpt: target_vpts){
-        double dist = std::sqrt(pow(pos(0) - vpt.position.x, 2) + pow(pos(1) - vpt.position.y, 2) + pow(pos(2) - vpt.position.z, 2));
-        if (dist < min_dist){
-          next_pos(0) = vpt.position.x;
-          next_pos(1) = vpt.position.y;
-          next_pos(2) = vpt.position.z;
-          geometry_msgs::Quaternion q = vpt.orientation;
-          double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
-          double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-          next_yaw = std::atan2(siny_cosp, cosy_cosp);
-          
-          min_dist = dist;
-        }
-      }
+    if (num_targets_vpts == 1 || use_greedy_search){
+
+      // METRIC COST
+      // double min_cost = 10000.0;
+      // for (auto& vpt: target_vpts){
+      //   // double dist = std::sqrt(pow(pos(0) - vpt.position.x, 2) + pow(pos(1) - vpt.position.y, 2) + pow(pos(2) - vpt.position.z, 2));
+        
+      //   Eigen::Vector3d tmp_pos(vpt.position.x, vpt.position.y, vpt.position.z);
+      //   geometry_msgs::Quaternion q = vpt.orientation;
+      //   double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+      //   double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+      //   double tmp_yaw = std::atan2(siny_cosp, cosy_cosp);
+
+      //   vector<Vector3d> path;
+      //   double cost = ViewNode::computeCost(pos, tmp_pos, yaw[0], tmp_yaw, vel, yaw[1], path);
+      //   if (cost < min_cost){
+      //     next_pos = tmp_pos;
+      //     next_yaw = tmp_yaw;
+      //     min_cost = cost;
+      //   }
+      // }
+
+      // SEMANTIC COST
+      int argmax = std::max_element(priorities.begin(), priorities.end())-priorities.begin();
+      geometry_msgs::Pose vpt = target_vpts[argmax];
+      next_pos = Eigen::Vector3d(vpt.position.x, vpt.position.y, vpt.position.z); 
+
+      geometry_msgs::Quaternion q = vpt.orientation;
+      double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+      double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+      next_yaw = std::atan2(siny_cosp, cosy_cosp);
+      ed_->global_tour_ = {pos, next_pos};
     }
 
     // TSP
@@ -207,15 +230,10 @@ int FastExplorationManager::planExploreMotion(
 
       vector<uint8_t> indices;
       // vector<uint16_t> priorities = vector<uint16_t>(num_targets_vpts+1,1);
-      if (use_lkh_){
+      if (!use_motsp_){
         findGlobalTour(cost_mat, indices);
       }
       else{
-        // make all priorities same if semantic search is off
-        if (!use_semantic_search_){
-          std::fill(priorities.begin(), priorities.end(), 1);
-        }
-
         solveMOTSP(cost_mat, priorities, indices);     
       }
       
@@ -257,7 +275,18 @@ int FastExplorationManager::planExploreMotion(
     ROS_WARN("Frontier: %d, t: %lf, viewpoint: %d, t: %lf", ed_->frontiers_.size(), frontier_time, ed_->points_.size(), view_time);
 
     // Global plan using TSP
-    if (ed_->points_.size() > 1) {
+    if (use_greedy_search){
+      double gain = -1;
+      expl_priorities.clear();
+        for (Frontier ftr: frontier_finder_->frontiers_){
+          if (ftr.viewpoints_.front().visib_num_>gain){
+            gain = ftr.viewpoints_.front().visib_num_;
+            next_pos = ftr.viewpoints_.front().pos_;
+            next_yaw = ftr.viewpoints_.front().yaw_;
+          }
+        }
+    }
+    else if (ed_->points_.size() > 1) {
       // Find the global tour passing through all viewpoints
       // Create TSP and solve by LKH
       // Optimal tour is returned as indices of frontier
@@ -270,16 +299,13 @@ int FastExplorationManager::planExploreMotion(
       frontier_finder_->getFullCostMatrix(pos, vel, yaw, cost_mat);
       
       // Solve TSP and get tour as indices of frontiers
-      if (use_lkh_){ // Metric LKH
+      if (!use_motsp_){ // Metric LKH
         findGlobalTour(cost_mat, indices);
       }
-      else{  // 2-opt-LNS
+      else{  // 2-opt-LNS with priorities
         expl_priorities.clear();
         for (Frontier ftr: frontier_finder_->frontiers_){
-          if (use_semantic_search_) // 2-opt-LNS with priorities
-            expl_priorities.push_back((uint16_t)ftr.viewpoints_.front().visib_num_);
-          else  // 2-opt-LNS without priorities
-            expl_priorities.push_back((uint16_t)1);
+          expl_priorities.push_back((uint16_t)ftr.viewpoints_.front().visib_num_);
         }
         solveMOTSP(cost_mat, expl_priorities, indices);
       }
@@ -383,6 +409,9 @@ int FastExplorationManager::planExploreMotion(
 
   }
 
+  ed_->next_pos_ = next_pos;
+  ed_->next_yaw_ = next_yaw;
+
   std::cout << "Next view: " << next_pos.transpose() << ", " << next_yaw << std::endl;
 
 
@@ -391,8 +420,22 @@ int FastExplorationManager::planExploreMotion(
   // Plan trajectory (position and yaw) to the next viewpoint
   t1 = ros::Time::now();
 
-  // search coarse kino Astar path and plan a bspline through points
-  if (getTrajToView(pos, vel, acc, yaw, next_pos, next_yaw) == FAIL)
+  // search coarse Astar path 
+  // Generate trajectory of x,y,z
+  planner_manager_->path_finder_->reset();
+  if (planner_manager_->path_finder_->search(pos, next_pos) != Astar::REACH_END) {
+    ROS_ERROR("No path to next viewpoint");
+    return FAIL;
+  }
+  ed_->path_next_goal_ = planner_manager_->path_finder_->getPath();
+  shortenPath(ed_->path_next_goal_);
+
+  const double len = Astar::pathLength(ed_->path_next_goal_);
+
+  if (len<0.1) return TRAJ_FAIL;
+
+  // plan a bspline through points
+  if (getTrajToView(pos, vel, acc, yaw, next_pos, next_yaw, len) == FAIL)
     return FAIL;
 
   double traj_plan_time = (ros::Time::now() - t1).toSec();
@@ -432,12 +475,8 @@ void FastExplorationManager::solveMOTSP(const Eigen::MatrixXd& cost_mat, const s
   }
 }
 
-int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eigen::Vector3d& vel, const Eigen::Vector3d& acc, const Eigen::Vector3d& yaw, Eigen::Vector3d& next_pos, double next_yaw){
-
-  // Compute time lower bound of yaw and use in trajectory generation
-  double diff = fabs(next_yaw - yaw[0]);
-  double time_lb = min(diff, 2 * M_PI - diff) / ViewNode::yd_;
-
+/* Gets AStar path to the next position*/
+double FastExplorationManager::getPathToView(const Eigen::Vector3d& pos, Eigen::Vector3d& next_pos){
   // Generate trajectory of x,y,z
   planner_manager_->path_finder_->reset();
   if (planner_manager_->path_finder_->search(pos, next_pos) != Astar::REACH_END) {
@@ -447,35 +486,58 @@ int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eig
   ed_->path_next_goal_ = planner_manager_->path_finder_->getPath();
   shortenPath(ed_->path_next_goal_);
 
+  const double len = Astar::pathLength(ed_->path_next_goal_);
+
+  return len;
+}
+
+
+int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eigen::Vector3d& vel, const Eigen::Vector3d& acc, const Eigen::Vector3d& yaw, Eigen::Vector3d& next_pos, double next_yaw, const double path_length){
+
+  // Compute time lower bound of yaw and use in trajectory generation
+  double diff = fabs(next_yaw - yaw[0]);
+  double time_lb_yaw = min(diff, 2 * M_PI - diff) / ViewNode::yd_;
+  double time_lb_pos = (pos-next_pos).norm()/ViewNode::vm_;
+
+  double time_lb = time_lb_yaw;
+
+  // // Generate trajectory of x,y,z
+  // planner_manager_->path_finder_->reset();
+  // if (planner_manager_->path_finder_->search(pos, next_pos) != Astar::REACH_END) {
+  //   ROS_ERROR("No path to next viewpoint");
+  //   return FAIL;
+  // }
+  // ed_->path_next_goal_ = planner_manager_->path_finder_->getPath();
+  // shortenPath(ed_->path_next_goal_);
+
   const double radius_far = 3.0;
   const double radius_close = 1.5;  // don't change this below 1.5 or you'll observe a alot of kinodynamic search failures
   const double radius_very_close = 0.2;
-  const double len = Astar::pathLength(ed_->path_next_goal_);
-  // if (len<radius_very_close){
-  //    // Generate traj through waypoints-based method
-  //   const int pt_num = ed_->path_next_goal_.size();
-  //   Eigen::MatrixXd ctrl_pts(pt_num, 3);
-  //   for (int i = 0; i < pt_num; ++i) ctrl_pts.row(i) = ed_->path_next_goal_[i];
-
-  //     Eigen::Vector3d zero(0, 0, 0);
-  //     Eigen::VectorXd times(pt_num - 1);
-  //     for (int i = 0; i < pt_num - 1; ++i)
-  //       times(i) = (pos.row(i + 1) - pos.row(i)).norm() / (pp_.max_vel_ * 0.5);
-
-  //     PolynomialTraj init_traj;
-  //     PolynomialTraj::waypointsTraj(pos, cur_vel, zero, cur_acc, zero, times, init_traj);
-
- 
+  // const double len = Astar::pathLength(ed_->path_next_goal_);
+  // if (path_length<radius_very_close){
+  //   ROS_WARN("veru close");
+  //   time_lb = time_lb_pos;
+  //   if (ed_->path_next_goal_.size()>1)
+  //     planner_manager_->planExploreTraj(ed_->path_next_goal_, vel, acc, time_lb, true); // update trajectory in place
+    
+  //   ed_->next_goal_ = next_pos;
+  // // return SUCCEED;
   // }
-  if (len < radius_close) {
+  if (path_length < radius_close) {
     // Next viewpoint is very close, no need to search kinodynamic path, just use waypoints-based
     // optimization
-    if (ed_->path_next_goal_.size()>1)
-      planner_manager_->planExploreTraj(ed_->path_next_goal_, vel, acc, time_lb); // update trajectory in place
+    if (ed_->path_next_goal_.size()>1){
+      planner_manager_->planExploreTraj(ed_->path_next_goal_, vel, acc, time_lb);
+      // if (planner_manager_->planExploreTraj(ed_->path_next_goal_, vel, acc, time_lb)<0) // update trajectory in place
+      //   return FAIL;
+    }
+      
     
     ed_->next_goal_ = next_pos;
 
-  } else if (len > radius_far) {  // Very rarely happens for our use case. The arena is very small
+  } 
+  
+  else if (path_length > radius_far) { 
     // Next viewpoint is far away, select intermediate goal on geometric path (this also deal with
     // dead end)
     std::cout << "Far goal." << std::endl;
@@ -489,18 +551,17 @@ int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eig
       truncated_path.push_back(cur_pt);
     }
     ed_->next_goal_ = truncated_path.back();
-        planner_manager_->planExploreTraj(truncated_path, vel, acc, time_lb);
-        // if (!planner_manager_->kinodynamicReplan(
-    //         pos, vel, acc, ed_->next_goal_, Vector3d(0, 0, 0), time_lb))
+    planner_manager_->planExploreTraj(truncated_path, vel, acc, time_lb);
+    // if (planner_manager_->planExploreTraj(truncated_path, vel, acc, time_lb)<0)
     //   return FAIL;
-    // ed_->kino_path_ = planner_manager_->kino_path_finder_->getKinoTraj(0.02);
-  } else {
+      
+  } 
+  else {
     // Search kino path to exactly next viewpoint and optimize
     std::cout << "Mid goal" << std::endl;
     ed_->next_goal_ = next_pos;
 
-    if (!planner_manager_->kinodynamicReplan(
-            pos, vel, acc, ed_->next_goal_, Vector3d(0, 0, 0), time_lb))
+    if (!planner_manager_->kinodynamicReplan(pos, vel, acc, ed_->next_goal_, Vector3d(0, 0, 0), time_lb))
       return FAIL;
   }
   double planned_time = planner_manager_->local_data_.position_traj_.getTimeSum();
@@ -508,10 +569,9 @@ int FastExplorationManager::getTrajToView(const Eigen::Vector3d& pos,  const Eig
     ROS_ERROR("Lower bound not satified! planned: %f , estimated: %f", planned_time, time_lb-0.1);
     // return FAIL;
   }
-  // else{
   planner_manager_->planYawExplore(yaw, next_yaw, true, ep_->relax_time_);
-  // }
-  
+  // if (planner_manager_->planYawExplore(yaw, next_yaw, true, ep_->relax_time_)<0)
+  //   return FAIL;
 
   return SUCCEED;
 }

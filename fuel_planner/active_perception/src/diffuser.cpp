@@ -5,6 +5,8 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <chrono>
 #include <cmath>
+#include <thread>
+
 
 typedef std::chrono::time_point<std::chrono::high_resolution_clock> time_point;
 typedef std::chrono::duration<double> time_diff;
@@ -14,12 +16,15 @@ typedef std::chrono::duration<double> time_diff;
 std::vector<std::vector<std::vector<float>>> calculateGaussianKernel(int size, double sigma, bool normalize=false) {
     std::vector<std::vector<std::vector<float>>> weights(size, std::vector<std::vector<float>>(size, std::vector<float>(size, 0.0)));
 
+    int depth = size / 2;
+    double scale = std::exp(-(3* depth * depth) / (2 * sigma * sigma)); // scales filter to have minimum value as 1
+
     double normalization = 0.0;
-    for (int i = -size / 2; i <= size / 2; ++i)
-        for (int j = -size / 2; j <= size / 2; ++j)
-            for (int k = -size / 2; k <= size / 2; ++k) {
+    for (int i = -depth; i <= depth; ++i)
+        for (int j = -depth; j <= depth; ++j)
+            for (int k = -depth; k <= depth; ++k) {
                 float weight = std::exp(-(i * i + j * j + k * k) / (2 * sigma * sigma));
-                weights[i + size / 2][j + size / 2][k + size / 2] = weight;
+                weights[i + depth][j + depth][k + depth] = weight/scale;
                 normalization += weight;
             }
 
@@ -33,28 +38,43 @@ std::vector<std::vector<std::vector<float>>> calculateGaussianKernel(int size, d
     return weights;
 }   
 
-Diffuser::Diffuser(const shared_ptr<fast_planner::EDTEnvironment>& edt, ros::NodeHandle& nh){
+Diffuser::Diffuser(ros::NodeHandle& nh){
     // References
-    _att_map = edt->_att_map;
-    _sdf_map = edt->sdf_map_;
+    // _att_map = edt->_att_map;
+    // _sdf_map = edt->sdf_map_;
 
     // Params
     nh.param("/diffusion/sigma", _kernel_sigma, 2); 
     nh.param("/diffusion/kernel_size", _kernel_size, 3); 
-    _att_min = _att_map->getAttMin();
+    nh.param("/priority_map/pmin", _att_min, 1.0f); 
 
     // member variables
-    diffusion_buffer = std::vector<float>(_sdf_map->buffer_size, 0.0f);
     _kernel_weights = calculateGaussianKernel(_kernel_size, _kernel_sigma, false);
     _kernel_depth = (_kernel_size - 1)/2;
 
     // ROS
     // _diffusion_timer = nh.createTimer(ros::Duration(0.1), &Diffuser::diffusionTimer, this);
     _map_pub = nh.advertise<sensor_msgs::PointCloud2>("/priority_map/diffused", 1);
+
+    // bool create_gt_map = 
+    // create ground truth diffusion map
+
+    
+    // std::thread gt_diffusion_thread(createGTDiffusionMap);
+    // gt_diffusion_thread.detach();
 }
 
 void Diffuser::setFrontierFinder(std::shared_ptr<fast_planner::FrontierFinder>& ff_ptr){
     _ff = ff_ptr;
+}
+
+void Diffuser::setPriorityMap(std::shared_ptr<PriorityMap>& pm_ptr){
+    _att_map = pm_ptr;
+}
+
+void Diffuser::setSDFMap(std::shared_ptr<fast_planner::SDFMap>& sdf_ptr){
+    _sdf_map = sdf_ptr;
+    diffusion_buffer = std::vector<float>(_sdf_map->buffer_size, 0.0f);
 }
 
 /*Get partial convolution filter value around a single voxel using kernel weights.
@@ -82,18 +102,56 @@ float Diffuser::partialConvolution(const Eigen::Vector3i& voxel){
         if (!_sdf_map->isInMap(nbr) || nbr_pos(2)<=0.2)
             continue;
 
-        float attention = _att_map->priority_buffer[nbr_adr] + diffusion_buffer[nbr_adr];
+        float attention = std::max(_att_map->priority_buffer[nbr_adr], diffusion_buffer[nbr_adr]);
         if (attention < _att_min) 
             continue;
 
         Eigen::Vector3i idx = (nbr - voxel).cwiseAbs();
         float weight = _kernel_weights[idx(0)+ _kernel_depth][idx(1)+ _kernel_depth][idx(2)+ _kernel_depth]; 
+        // print(weight);
         att_nbr += weight*attention;
         norm += weight;   // for partial convolution renormalisation
     }
+    // print(norm);
     float att_diffused = (norm>0)? att_nbr/norm:_att_min; // clip at minimum attention for coverage 
     return att_diffused;
 }
+
+// float Diffuser::fullConvolution(const Eigen::Vector3i& voxel){
+//     /* 
+//     find dense neibhours in kernel size
+//     for each nbr
+//         sum = (top down priority) + (bottup diffusion)
+//         if sum > min
+//             weight the nbr using kernel weight
+//             count++
+//     convolved value = weighted sum/count
+//     */
+
+//     auto nbrs = _ff->allNeighbors(voxel, _kernel_depth); // 124 neighbors
+//     float att_nbr = 0.0; 
+//     float norm = 0;
+//     Eigen::Vector3d nbr_pos;
+//     for (auto nbr : nbrs) {
+//         _sdf_map->indexToPos(nbr, nbr_pos);
+//         int nbr_adr = _sdf_map->toAddress(nbr);
+
+//         if (!_sdf_map->isInMap(nbr) || nbr_pos(2)<=0.2)
+//             continue;
+
+//         float attention = _att_map->priority_buffer[nbr_adr] + diffusion_buffer[nbr_adr];
+//         if (attention < _att_min) 
+//             continue;
+
+//         Eigen::Vector3i idx = (nbr - voxel).cwiseAbs();
+//         float weight = _kernel_weights[idx(0)+ _kernel_depth][idx(1)+ _kernel_depth][idx(2)+ _kernel_depth]; 
+//         att_nbr += weight*attention;
+//         norm += weight;   // for partial convolution renormalisation
+//     }
+//     float att_diffused = (norm>0)? att_nbr/norm:_att_min; // clip at minimum attention for coverage 
+//     return att_diffused;
+// }
+
 
 /*Diffuse the priority buffer into nearby frontier voxels*/
 void Diffuser::diffusionTimer(const ros::TimerEvent& event){

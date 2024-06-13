@@ -53,6 +53,7 @@ void BsplineOptimizer::setParam(ros::NodeHandle& nh) {
   nh.param("manager/bspline_degree", bspline_degree_, 3);
 
   time_lb_ = -1;  // Not used by in most case
+  nlopt::srand(0);
 }
 
 void BsplineOptimizer::setEnvironment(const EDTEnvironment::Ptr& env) {

@@ -13,6 +13,8 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/CompressedImage.h>
+#include <common_msgs/Float64Stamped.h>
+
 #include <memory>
 #include <random>
 
@@ -60,7 +62,7 @@ private:
   void attCallback(const sensor_msgs::ImageConstPtr& img);
   unique_ptr<cv::Mat> att_image_; // holds 2d attention map
   // ros::Subscriber att_sub_; // subscribes to 2d attention map
-  ros::Publisher att_3d_pub_;  // publish 3d attention map
+  ros::Publisher att_3d_pub_, entropy_pub;  // publish 3d attention map
   bool attention_needs_update_ = false;
   ros::Publisher occ_pub_;  // publish occupancy buffer
   ros::Publisher occ_inflate_pub_;  // publish inflated occupancy buffer
@@ -109,6 +111,8 @@ private:
   double visualization_truncate_height_, visualization_truncate_low_;
   bool show_esdf_time_, show_occ_time_;
   bool show_all_map_;
+  int p_max; // max priority to recover priority mask values
+
 
   // data
   // flags of map state

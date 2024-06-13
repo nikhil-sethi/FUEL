@@ -27,7 +27,7 @@ class FrontierFinder;
 struct ExplorationParam;
 struct ExplorationData;
 
-enum EXPL_RESULT { NO_FRONTIER, FAIL, SUCCEED };
+enum EXPL_RESULT { NO_FRONTIER, FAIL, SUCCEED , TRAJ_FAIL};
 enum TARGET_SEARCH {GREEDY, TSP, TSP_REFINED};
 
 class FastExplorationManager {
@@ -56,6 +56,10 @@ public:
   std::vector<geometry_msgs::Pose> target_vpts;
   std::vector<uint16_t> priorities;
   std::vector<uint16_t> expl_priorities;
+  bool use_motsp_ = false;
+  bool use_object_vpts_ = false;
+  bool use_diffusion_ = false;
+  bool use_greedy_search = false;
 
 private:
   shared_ptr<EDTEnvironment> edt_environment_;
@@ -67,9 +71,7 @@ private:
   geometry_msgs::Pose custom_goal_pose;
   ros::ServiceClient tsp_client;
   bool CUSTOM_GOAL = false;
-  bool use_active_perception_ = false;
-  bool use_semantic_search_ = false;
-  bool use_lkh_ = false;
+
 
   // Find optimal tour for coarse viewpoints of all frontiers
   void findGlobalTour(const Eigen::MatrixXd& cost_mat, vector<uint8_t>& indices);
@@ -84,10 +86,11 @@ private:
   void customPoseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg);
   // void findTargetTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, vector<int>& indices);
   void getPathForTour(const Vector3d& pos, const vector<uint8_t>& ids, vector<Vector3d>& path);
-  int getTrajToView(const Eigen::Vector3d& pos,  const Eigen::Vector3d& vel, const Eigen::Vector3d& acc, const Eigen::Vector3d& yaw, Eigen::Vector3d& next_pos, double next_yaw);
+  int getTrajToView(const Eigen::Vector3d& pos,  const Eigen::Vector3d& vel, const Eigen::Vector3d& acc, const Eigen::Vector3d& yaw, Eigen::Vector3d& next_pos, double next_yaw, const double path_length);
   void getTargetCostMatrix(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, Eigen::MatrixXd& cost_mat);
   void readTourFromFile(vector<int>& indices, const std::string& file_dir);
   void solveMOTSP(const Eigen::MatrixXd& cost_mat, const std::vector<uint16_t>& priorities, std::vector<uint8_t>& tour);
+  double getPathToView(const Eigen::Vector3d& pos, Eigen::Vector3d& next_pos);
 
 public:
   typedef shared_ptr<FastExplorationManager> Ptr;

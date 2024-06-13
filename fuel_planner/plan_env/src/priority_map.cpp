@@ -18,7 +18,6 @@ void PriorityMap::init(ros::NodeHandle& nh){
 
     // ROS Parameters    
     nh.param("/priority_map/pmin", _att_min, 1.0f); 
-    // nh.param("/perception/priority_map/3d/diffusion_factor", _diffusion_factor, 0.9f); 
     nh.param("/priority_map/learning_rate", _learning_rate, 0.5f); 
 
     // ROS pub, sub, timers    

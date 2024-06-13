@@ -813,7 +813,7 @@ bool FrontierFinder::isFrontierCovered() {
 int FrontierFinder::countVisibleCells(
     const Eigen::Vector3d& pos, const double& yaw, const vector<Eigen::Vector3d>& cluster) {
   percep_utils_->setPose(pos, yaw);
-  float visib_num = 0;
+  int visib_num = 0;
   float total_gain = 0;
   Eigen::Vector3i idx;
   
@@ -837,12 +837,13 @@ int FrontierFinder::countVisibleCells(
     if (visib) {
       float gain = diffuser_->diffusion_buffer[cell_adr];
       total_gain += std::max(std::exp(gamma*(gain-1)), 1.0f);
-      // visib_num += 1;
-      // std::cout<<diffuser_->diffusion_buffer[cell_adr]<<std::endl;
+      // visib_num += 1; // pure coverage
+      
     }
   }
   // std::cout<<"total gain: "<<(int)std::round(total_gain) <<"coverage: "<<visib_num<<std::endl;
   return (int)std::round(total_gain);
+  // return visib_num;
 }
 
 void FrontierFinder::downsample(

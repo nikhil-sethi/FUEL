@@ -6,14 +6,17 @@
 #include <active_perception/frontier_finder.h>
 
 class fast_planner::SDFMap;
-
+class DiffusionMapGT;
 class Diffuser{
     public:
-        Diffuser(const shared_ptr<fast_planner::EDTEnvironment>& edt, ros::NodeHandle& nh);
+        Diffuser(ros::NodeHandle& nh);
         void setFrontierFinder(std::shared_ptr<fast_planner::FrontierFinder>& ff_ptr);
+        void setPriorityMap(std::shared_ptr<PriorityMap>& pm_ptr);
+        void setSDFMap(std::shared_ptr<fast_planner::SDFMap>& sdf_ptr);
+
         void diffusionTimer(const ros::TimerEvent& event);
         std::vector<float> diffusion_buffer;
-
+        friend DiffusionMapGT;
     private:
         // Member functions
         

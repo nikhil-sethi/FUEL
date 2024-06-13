@@ -62,7 +62,7 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
   att_map->init(nh); // needs map to be set first
 
   _map_ros->setPriorityMap(att_map);
-  edt_environment_->setPriorityMap(att_map);
+  // edt_environment_->setPriorityMap(att_map);
 
   
   if (use_geometric_path) {
@@ -104,11 +104,11 @@ void FastPlannerManager::initPlanModules(ros::NodeHandle& nh) {
 
   // }
 
-  bool use_diffusion = true;
-  if (use_diffusion){
-    diffuser_.reset(new Diffuser(edt_environment_, nh));
-    // diffuser_->setFrontierFinder(frontier_finder_);
-  }
+  // diffusion map is default for information calc. need it
+  diffuser_.reset(new Diffuser(nh));
+  diffuser_->setPriorityMap(att_map);
+  diffuser_->setSDFMap(sdf_map_);
+  
 
 }
 
@@ -286,8 +286,7 @@ bool FastPlannerManager::kinodynamicReplan(const Eigen::Vector3d& start_pt,
   return true;
 }
 
-void FastPlannerManager::planExploreTraj(const vector<Eigen::Vector3d>& tour,
-    const Eigen::Vector3d& cur_vel, const Eigen::Vector3d& cur_acc, const double& time_lb) {
+int FastPlannerManager::planExploreTraj(const vector<Eigen::Vector3d>& tour, const Eigen::Vector3d& cur_vel, const Eigen::Vector3d& cur_acc, const double& time_lb) {
   if (tour.empty()) ROS_ERROR("Empty path to traj planner");
 
   // Generate traj through waypoints-based method
@@ -309,9 +308,6 @@ void FastPlannerManager::planExploreTraj(const vector<Eigen::Vector3d>& tour,
 
   int seg_num = init_traj.getLength() / pp_.ctrl_pt_dist;
   seg_num = max(8, seg_num);
-  // if (duration<0.2){
-  //   seg_num = min(3, seg_num);
-  // }
   double dt = duration / double(seg_num);
 
   // std::cout << "duration: " << duration << ", seg_num: " << seg_num << ", dt: " << dt << std::endl;
@@ -336,12 +332,13 @@ void FastPlannerManager::planExploreTraj(const vector<Eigen::Vector3d>& tour,
   bspline_optimizers_[0]->setBoundaryStates(start, end);
   if (time_lb > 0) bspline_optimizers_[0]->setTimeLowerBound(time_lb);
   int res = bspline_optimizers_[0]->optimize(ctrl_pts, dt, cost_func, 1, 1);
-
-  if (res>0){
-    local_data_.position_traj_.setUniformBspline(ctrl_pts, pp_.bspline_degree_, dt);
-  }
+  std::cout<<"position res: "<<res<<std::endl;
+  if (res>0)
+    local_data_.position_traj_.setUniformBspline(ctrl_pts, pp_.bspline_degree_, dt);  
+  
   updateTrajInfo();
-    
+
+  return res;
 }
 
 
@@ -367,7 +364,7 @@ void FastPlannerManager::planExploreTraj(const vector<Eigen::Vector3d>& tour,
 //     double duration = init_traj.getTotalTime();
 
 //     int seg_num = init_traj.getLength() / pp_.ctrl_pt_dist;
-//     seg_num = max(8, seg_num);
+//     seg_num = max(3, seg_num);
 //     // if (duration<0.2){
 //     //   seg_num = min(3, seg_num);
 //     // }
@@ -392,15 +389,14 @@ void FastPlannerManager::planExploreTraj(const vector<Eigen::Vector3d>& tour,
 
 //     vector<Vector3d> start, end;
 //     tmp_traj.getBoundaryStates(2, 0, start, end);
-//     if (duration<0.2){
 
-//       local_data_.position_traj_.setUniformBspline(points, pp_.bspline_degree_, dt);
-//     }
 //     if (res>0){
 //       local_data_.position_traj_.setUniformBspline(pos, pp_.bspline_degree_, dt);
 //     }
 //     updateTrajInfo();
 //   }
+
+
 
 // !SECTION
 
@@ -1003,7 +999,7 @@ void FastPlannerManager::planYaw(const Eigen::Vector3d& start_yaw) {
 // }
 
 // only consider smoothness and boundary state
-void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const double& end_yaw,
+int FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const double& end_yaw,
     bool lookfwd, const double& relax_time) {
   const int seg_num = 12;
   double dt_yaw = local_data_.duration_ / double(seg_num);  // time of B-spline segment
@@ -1112,14 +1108,12 @@ void FastPlannerManager::planYawExplore(const Eigen::Vector3d& start_yaw, const 
   // std::cout << "2: " << (ros::Time::now() - t1).toSec() << std::endl;
 
   // Update traj info
-  if (res>0){
-    local_data_.yaw_traj_.setUniformBspline(yaw, 3, dt_yaw);
-    local_data_.yawdot_traj_ = local_data_.yaw_traj_.getDerivative();
-    local_data_.yawdotdot_traj_ = local_data_.yawdot_traj_.getDerivative();
-    plan_data_.dt_yaw_ = dt_yaw;
+  local_data_.yaw_traj_.setUniformBspline(yaw, 3, dt_yaw);
+  local_data_.yawdot_traj_ = local_data_.yaw_traj_.getDerivative();
+  local_data_.yawdotdot_traj_ = local_data_.yawdot_traj_.getDerivative();
+  plan_data_.dt_yaw_ = dt_yaw;
 
-  }
-  
+  return res;
   // plan_data_.path_yaw_ = path;
   // plan_data_.dt_yaw_path_ = dt_yaw * subsp;
 }

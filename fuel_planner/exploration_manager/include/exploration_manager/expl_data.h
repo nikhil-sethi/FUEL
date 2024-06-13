@@ -51,6 +51,9 @@ struct ExplorationData {
   Vector3d next_goal_;
   vector<Vector3d> path_next_goal_;
 
+  Vector3d next_pos_;
+  double next_yaw_;
+
   // viewpoint planning
   // vector<Vector4d> views_;
   vector<Vector3d> views_vis1_, views_vis2_;
