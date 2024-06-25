@@ -269,7 +269,7 @@ int FastExplorationManager::planExploreMotion(
 
     frontier_finder_->getTopViewpointsInfo(pos, ed_->points_, ed_->yaws_, ed_->averages_);
     for (uint i = 0; i < ed_->points_.size(); ++i)
-      ed_->views_.push_back(ed_->points_[i] + 2.0 * Vector3d(cos(ed_->yaws_[i]), sin(ed_->yaws_[i]), 0));
+      ed_->views_.push_back(ed_->points_[i] + 0.4 * Vector3d(cos(ed_->yaws_[i]), sin(ed_->yaws_[i]), 0));
 
     double view_time = (ros::Time::now() - t1).toSec();
     ROS_WARN("Frontier: %d, t: %lf, viewpoint: %d, t: %lf", ed_->frontiers_.size(), frontier_time, ed_->points_.size(), view_time);

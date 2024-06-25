@@ -9,6 +9,7 @@
 #include <plan_env/sdf_map.h>
 #include <std_srvs/Trigger.h>
 #include "quadrotor_msgs/PositionCommand.h"
+#include "geometry_msgs/PoseArray.h"
 
 using Eigen::Vector4d;
 
@@ -52,7 +53,7 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   metrics_client_ = nh.serviceClient<std_srvs::Trigger>("/finish_metrics_service");
   px4ci_finish_client = nh.serviceClient<std_srvs::Trigger>("/px4_mission_finished_ext_cont");
   disable_interface_client_ = nh.serviceClient<std_srvs::Trigger>("/px4_ext_cont_disable");
-
+  target_vpts_viz_pub  = nh.advertise<geometry_msgs::PoseArray>("/target_vpts_vis", 10);
   tries = 0;
 
 }
@@ -332,7 +333,7 @@ void FastExplorationFSM::visualize() {
 
   visualization_->drawSpheres(ed_ptr->points_, 0.2, expl_vpt_colors, "exploration_points", 0, 6);
   visualization_->drawLines(ed_ptr->global_tour_, 0.07, Vector4d(0.1, 0.1, 0.1, 1), "global_tour", 0, 6);
-  visualization_->drawLines(ed_ptr->points_, ed_ptr->views_, 0.05, Vector4d(0, 1, 0.5, 1), "view", 0, 6);
+  visualization_->drawLines(ed_ptr->points_, ed_ptr->views_, 0.05, Vector4d(1, 1, 0.0, 1), "view", 0, 6);
   visualization_->drawLines(ed_ptr->points_, ed_ptr->averages_, 0.03, Vector4d(1, 0, 0, 1),
   "point-average", 0, 6);
 
@@ -362,13 +363,16 @@ void FastExplorationFSM::visualize() {
   // visualization_->drawSpheres(plan_data->kino_path_, 0.1, Vector4d(1, 0, 1, 1), "kino_path", 0, 0);
   // visualization_->drawLines(ed_ptr->path_next_goal_, 0.05, Vector4d(0, 1, 1, 1), "next_goal", 1, 6);
 
-    if (expl_manager_->use_object_vpts_){
+  if (expl_manager_->use_object_vpts_){
       int i=0;
       for (Object& object: expl_manager_->object_finder->global_objects ){
           visualization_->drawBox(object.centroid_, object.scale_, Eigen::Vector4d(0.5, 0, 1, 0.3), "box"+std::to_string(i), i, 7);
           i++;
       }
-
+      geometry_msgs::PoseArray msg;
+      msg.header.frame_id = "map";
+      msg.poses = expl_manager_->target_vpts;
+      target_vpts_viz_pub.publish(msg); // pose arrows
 
       float min_gain = 10; 
       float max_gain= 150;
