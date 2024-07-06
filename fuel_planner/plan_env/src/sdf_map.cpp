@@ -28,6 +28,7 @@ void SDFMap::setParams(ros::NodeHandle& nh, std::string ns){
   nh.param(ns + "sdf_map/optimistic", mp_->optimistic_, true);
   nh.param(ns + "sdf_map/signed_dist", mp_->signed_dist_, false);
   nh.param("/world", world, std::string("amrlab"));
+  nh.param("/sim", is_sim, false);
 
   mp_->local_bound_inflate_ = max(mp_->resolution_, mp_->local_bound_inflate_);
   mp_->resolution_inv_ = 1 / mp_->resolution_;
@@ -138,7 +139,8 @@ void SDFMap::initMap(MapROS* map_ros, ros::NodeHandle& nh) {
     md_->all_max_[i] = -1000000;
   }
 
-  loadGTAttMap();
+  if (is_sim)
+    loadGTAttMap();
 
 
 }

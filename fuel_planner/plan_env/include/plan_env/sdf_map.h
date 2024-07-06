@@ -78,6 +78,7 @@ public:
   void loadGTAttMap();
   void closeFile();
   int buffer_size;
+  bool is_sim;
   std::string world;
   std::vector<float> diffusion_buffer_gt; // fill
 
