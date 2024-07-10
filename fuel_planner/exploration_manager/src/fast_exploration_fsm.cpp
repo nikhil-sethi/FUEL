@@ -39,7 +39,7 @@ void FastExplorationFSM::init(ros::NodeHandle& nh) {
   /* Ros sub, pub and timer */
   exec_timer_ = nh.createTimer(ros::Duration(0.01), &FastExplorationFSM::FSMCallback, this);
   safety_timer_ = nh.createTimer(ros::Duration(0.05), &FastExplorationFSM::safetyCallback, this);
-  // frontier_timer_ = nh.createTimer(ros::Duration(0.5), &FastExplorationFSM::frontierCallback, this);
+  frontier_timer_ = nh.createTimer(ros::Duration(0.5), &FastExplorationFSM::frontierCallback, this);
 
   trigger_sub_ =
       nh.subscribe("/waypoint_generator/waypoints", 1, &FastExplorationFSM::triggerCallback, this);
@@ -166,7 +166,6 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
       // else if (res==TRAJ_FAIL) // Trajectory planning failed, try position control
       //   ROS_WARN("Trajectory failed. Switching to waypoint planning");
       //   publish_cmd(expl_manager_->ed_->next_pos_, expl_manager_->ed_->next_yaw_);
-        
       break;
     }
 
@@ -179,6 +178,7 @@ void FastExplorationFSM::FSMCallback(const ros::TimerEvent& e) {
 
         thread vis_thread(&FastExplorationFSM::visualize, this);
         vis_thread.detach();
+        // exit(0);
       }
       break;
     }
@@ -366,7 +366,7 @@ void FastExplorationFSM::visualize() {
   if (expl_manager_->use_object_vpts_){
       int i=0;
       for (Object& object: expl_manager_->object_finder->global_objects ){
-          visualization_->drawBox(object.centroid_, object.scale_, Eigen::Vector4d(0.5, 0, 1, 0.3), "box"+std::to_string(i), i, 7);
+          visualization_->drawBox(object.centroid_, object.scale_, Eigen::Vector4d(0.1, 0.1, 0.1, 0.2), "box"+std::to_string(i), i, 7);
           i++;
       }
       geometry_msgs::PoseArray msg;
@@ -375,7 +375,7 @@ void FastExplorationFSM::visualize() {
       target_vpts_viz_pub.publish(msg); // pose arrows
 
       float min_gain = 10; 
-      float max_gain= 150;
+      float max_gain= 600;
       // std::vector<Eigen::Vector3d> vpt_positions;
       std::vector<Eigen::Vector4d> vpt_colors;
         std::vector<Eigen::Vector3d> vpt_positions;
@@ -383,7 +383,6 @@ void FastExplorationFSM::visualize() {
         int k = 0;
         
         for (auto vpt: expl_manager_->target_vpts){
-          
           pos(0) = vpt.position.x;
           pos(1) = vpt.position.y;
           pos(2) = vpt.position.z;
@@ -395,9 +394,22 @@ void FastExplorationFSM::visualize() {
             k++;
         }
         if (!vpt_positions.empty()) visualization_->drawSpheres(vpt_positions, 0.2, vpt_colors, "points_", 1, 6);
+        
 
-      // }
-    }
+        // === To plot sampled viewpoints
+
+        // int j=0;
+        // std::vector<Eigen::Vector3d> sampled_vpts;
+        
+        // for (auto vpts: expl_manager_->target_planner_->all_viewpoints){
+        //   j++;
+        //   for (auto vpt: vpts){
+        //     sampled_vpts.push_back(vpt.posToEigen()); 
+        //   }
+        // }
+        // // std::cout<<sampled_vpts.size()<<std::endl;
+        // if (!sampled_vpts.empty()) visualization_->drawSpheres(sampled_vpts, 0.1, Eigen::Vector4d(0.5, 0.5, 1, 1), "sampledpoints_", 2, 6);
+  }
 }
 
 void FastExplorationFSM::clearVisMarker() {
@@ -420,6 +432,7 @@ void FastExplorationFSM::frontierCallback(const ros::TimerEvent& e) {
     auto ed = expl_manager_->ed_;
     ft->removeOldFrontiers();
     ft->searchNewFrontiers();
+    expl_manager_->planner_manager_->diffuser_->diffusionTimer(ros::TimerEvent());
     ft->computeFrontiersToVisit();
     ft->updateFrontierCostMatrix();
 

@@ -41,16 +41,20 @@ void TargetPlanner::informationGainTimer(const ros::TimerEvent& event){
 
     // Sample viewpoints around all objects
     all_viewpoints.clear();
+    int i = 0;
     for (Object& object: _obj_fnd->global_objects){   
         if (!object.isInBox(local_box_min, local_box_max)) continue;
           
         std::vector<TargetViewpoint> sample_vpts; 
         sampleViewpoints(object, sample_vpts);
         all_viewpoints.push_back(sample_vpts);
+        // i += sample_vpts.size();
+        // std::cout<<"Dfg "<<sample_vpts.size()<<std::endl;
     }
     
     filterSimilarPoses(all_viewpoints);
     
+
     // Calculate priority of each viewpoint 
     std::list<std::vector<TargetViewpoint>>::iterator iter = all_viewpoints.begin();
     for (Object& object: _obj_fnd->global_objects){      

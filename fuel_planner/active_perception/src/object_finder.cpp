@@ -27,9 +27,9 @@ bool enforceIntensitySimilarity (const pcl::PointXYZI& point_a, const pcl::Point
 {
   // close enough + discrete enough + similar enough
   
-  if (squared_distance > 1 || std::abs (point_a.intensity - point_b.intensity) > 1e-1f)
-    return (false);
-  return (true);
+  if (squared_distance > 1 || std::abs (point_a.intensity - point_b.intensity) > 0.1f)
+    return false;
+  return true;
 }
 
 ObjectFinder::ObjectFinder(ros::NodeHandle& nh){
@@ -149,6 +149,8 @@ void ObjectFinder::mergeObjects(std::list<Object> new_objects){
 bool ObjectFinder::areObjectsSimilar(const Object& obj_a, const Object& obj_b, double overlapThreshold){
     // if ((obj_a.bbox_min_-obj_b.bbox_min_).norm() < 0.1 && (obj_a.bbox_max_-obj_b.bbox_max_).norm() < 0.1)
     //     return true;
+
+    if (std::abs(obj_a.priority_ - obj_b.priority_)>0.8) return false;
 
     BoundingBox box1(obj_a.bbox_min_, obj_a.bbox_max_);
     BoundingBox box2(obj_b.bbox_min_, obj_b.bbox_max_);

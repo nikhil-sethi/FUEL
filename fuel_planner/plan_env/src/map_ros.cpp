@@ -77,7 +77,7 @@ void MapROS::init(ros::NodeHandle& nh) {
   update_range_pub_ = nh.advertise<visualization_msgs::Marker>("/sdf_map/update_range", 10);
   depth_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/sdf_map/depth_cloud", 10);
 
-  depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(nh, "/map_ros/depth", 50));
+  depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::CompressedImage>(nh, "/map_ros/depth", 50));
   cloud_sub_.reset(
       new message_filters::Subscriber<sensor_msgs::PointCloud2>(nh, "/map_ros/cloud", 50));
   pose_sub_.reset(
@@ -86,8 +86,8 @@ void MapROS::init(ros::NodeHandle& nh) {
   // att_sub_ = nh.subscribe("/iris_depth_camera/priority_map/2d", 10, &MapROS::attCallback, this);
   att_sub_.reset(new message_filters::Subscriber<sensor_msgs::CompressedImage>(nh, "/priority_mask/compressed", 50));
   
-  sync_image_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePose>(
-      MapROS::SyncPolicyImagePose(100), *depth_sub_, *pose_sub_));
+  // sync_image_pose_.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePose>(
+  //     MapROS::SyncPolicyImagePose(100), *depth_sub_, *pose_sub_));
   
   sync_image_pose_compimage.reset(new message_filters::Synchronizer<MapROS::SyncPolicyImagePoseCompressedImage>(
       MapROS::SyncPolicyImagePoseCompressedImage(100), *depth_sub_, *pose_sub_, *att_sub_));
@@ -156,7 +156,7 @@ void MapROS::updateESDFCallback(const ros::TimerEvent& /*event*/) {
              max_esdf_time_);
 }
 
-void MapROS::depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
+void MapROS::depthPoseAttCallback(const sensor_msgs::CompressedImageConstPtr& img,
                                const geometry_msgs::PoseStampedConstPtr& pose,
                                const sensor_msgs::CompressedImageConstPtr& att) {
   camera_pos_(0) = pose->pose.position.x;
@@ -167,9 +167,9 @@ void MapROS::depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
 
   camera_q_ = Eigen::Quaterniond(pose->pose.orientation.w, pose->pose.orientation.x,
                                  pose->pose.orientation.y, pose->pose.orientation.z);
-  cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img, img->encoding);
-  if (img->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
-    (cv_ptr->image).convertTo(cv_ptr->image, CV_16UC1, k_depth_scaling_factor_);
+  cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img);
+  // if (img->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
+  //   (cv_ptr->image).convertTo(cv_ptr->image, CV_16UC1, k_depth_scaling_factor_);
   cv_ptr->image.copyTo(*depth_image_);
 
   auto t1 = ros::Time::now();

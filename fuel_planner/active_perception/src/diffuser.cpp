@@ -99,7 +99,7 @@ float Diffuser::partialConvolution(const Eigen::Vector3i& voxel){
         _sdf_map->indexToPos(nbr, nbr_pos);
         int nbr_adr = _sdf_map->toAddress(nbr);
 
-        if (!_sdf_map->isInMap(nbr) || nbr_pos(2)<=0.2)
+        if (!_sdf_map->isInMap(nbr) || nbr_pos(2)<=0.0)
             continue;
 
         float attention = std::max(_att_map->priority_buffer[nbr_adr], diffusion_buffer[nbr_adr]);
@@ -172,7 +172,7 @@ void Diffuser::diffusionTimer(const ros::TimerEvent& event){
                 int adr = _sdf_map->toAddress(x,y,z);            
 
                 // diffusion map only contains frontiers
-                if (_ff->frontier_flag_[adr]==0|| z<=2){ // z filter removes noise close to ground and avoids getting stuck
+                if (_ff->frontier_flag_[adr]==0|| z<=0){ // z filter removes noise close to ground and avoids getting stuck
                     diffusion_buffer[adr]=0;
                     continue;
                 }

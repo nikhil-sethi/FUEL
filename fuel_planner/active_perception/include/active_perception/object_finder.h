@@ -18,7 +18,7 @@ class TargetViewpoint;
 struct Object{
     int id;
     // pcl::PointCloud<pcl::PointXYZI> points;
-    float max_gain;
+    float priority_;
     Eigen::Vector3d bbox_min_;
     Eigen::Vector3d bbox_max_;
     Eigen::Vector3d centroid_;
@@ -36,6 +36,12 @@ struct Object{
 
         bbox_min_ = Eigen::Vector3d(bbox_min.x-0.02, bbox_min.y-0.02, bbox_min.z-0.02);
         bbox_max_ = Eigen::Vector3d(bbox_max.x+0.02, bbox_max.y+0.02, bbox_max.z+0.02);
+
+        priority_ = 0;
+        for (auto pt: points){
+            priority_+=pt.intensity;
+        }
+        priority_ = priority_/points.size();
 
         computeInfo();
     }
@@ -64,6 +70,8 @@ struct Object{
     void merge(const Object& other){
         bbox_min_ = bbox_min_.cwiseMin(other.bbox_min_);
         bbox_max_ = bbox_max_.cwiseMax(other.bbox_max_);
+        priority_ = (priority_ + other.priority_)/2;
+        
         computeInfo(); // update
     }
 

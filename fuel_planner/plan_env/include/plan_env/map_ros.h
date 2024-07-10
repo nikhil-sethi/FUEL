@@ -38,7 +38,7 @@ public:
   void init(ros::NodeHandle& nh);
 
 private:
-  void depthPoseAttCallback(const sensor_msgs::ImageConstPtr& img,
+  void depthPoseAttCallback(const sensor_msgs::CompressedImageConstPtr& img,
                          const geometry_msgs::PoseStampedConstPtr& pose,
                          const sensor_msgs::CompressedImageConstPtr& att);
   void cloudPoseCallback(const sensor_msgs::PointCloud2ConstPtr& msg,
@@ -76,7 +76,7 @@ private:
   // may use ExactTime?
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped>
       SyncPolicyImagePose;
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped, sensor_msgs::CompressedImage>
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::CompressedImage, geometry_msgs::PoseStamped, sensor_msgs::CompressedImage>
       SyncPolicyImagePoseCompressedImage;
       
   typedef shared_ptr<message_filters::Synchronizer<SyncPolicyImagePose>> SynchronizerImagePose;
@@ -87,7 +87,7 @@ private:
   typedef shared_ptr<message_filters::Synchronizer<SyncPolicyCloudPose>> SynchronizerCloudPose;
 
   // ros::NodeHandle node_;
-  shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depth_sub_;
+  shared_ptr<message_filters::Subscriber<sensor_msgs::CompressedImage>> depth_sub_;
   shared_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> cloud_sub_;
   shared_ptr<message_filters::Subscriber<geometry_msgs::PoseStamped>> pose_sub_;
   shared_ptr<message_filters::Subscriber<sensor_msgs::CompressedImage>> att_sub_;

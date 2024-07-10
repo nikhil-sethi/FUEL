@@ -33,6 +33,15 @@ void SDFMap::setParams(ros::NodeHandle& nh, std::string ns){
   mp_->local_bound_inflate_ = max(mp_->resolution_, mp_->local_bound_inflate_);
   mp_->resolution_inv_ = 1 / mp_->resolution_;
   mp_->map_origin_ = Eigen::Vector3d(-x_size / 2.0, -y_size / 2.0, mp_->ground_height_);
+
+  double box_min_x, box_min_y;
+  nh.param(ns + "sdf_map/box_min_x", box_min_x, -1.0);
+  // nh.param(ns + "sdf_map/box_max_x", box_max_x, -1.0);
+  nh.param(ns + "sdf_map/box_min_y", box_min_y, -1.0);
+  // nh.param(ns + "sdf_map/box_max_y", box_max_y, -1.0);
+
+  mp_->map_origin_ = Eigen::Vector3d(box_min_x, box_min_y, mp_->ground_height_);
+  // mp_->map_origin_ = Eigen::Vector3d(-x_size / 2.0, -y_size / 2.0, mp_->ground_height_);
   mp_->map_size_ = Eigen::Vector3d(x_size, y_size, z_size);
   for (int i = 0; i < 3; ++i)
     mp_->map_voxel_num_(i) = ceil(mp_->map_size_(i) / mp_->resolution_);
