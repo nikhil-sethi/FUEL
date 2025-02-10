@@ -107,9 +107,9 @@ void SDFMap::loadGTAttMap(){
     pcl::PointCloud<pcl::PointXYZI> cloud;
 
     // Load PCD file
-    // std::string file = "/root/thesis_ws/src/thesis/sw/perception/attention_map/assets/attention_map_diffused_gt.pcd";
-    // std::string file = "/root/thesis_ws/src/thesis/sw/bringup/models/earthquake/earthquake_diffusion_map_gt.pcd";
-    std::string file = "/root/thesis_ws/src/thesis/sw/bringup/models/" + world + "/diff_map_gt.pcd";
+    // std::string file = "/workspaces/stem_ws/src/thesis/sw/perception/attention_map/assets/attention_map_diffused_gt.pcd";
+    // std::string file = "/workspaces/stem_ws/src/thesis/sw/stem_bringup/models/earthquake/earthquake_diffusion_map_gt.pcd";
+    std::string file = "/workspaces/stem_ws/src/thesis/sw/stem_bringup/models/" + world + "/diff_map_gt.pcd";
     if (pcl::io::loadPCDFile<pcl::PointXYZI>(file, cloud) == -1)
     {
         ROS_ERROR("Couldn't read file cloud.pcd");

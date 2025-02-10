@@ -109,7 +109,7 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   par_file << "RUNS = 1\n";
 
   // Initialize TSP par file
-  std::string dir = "/root/thesis_ws/src/thesis/sw/bringup/resource";
+  std::string dir = "/workspaces/stem_ws/src/thesis/sw/stem_bringup/resource";
   ofstream par_file2(dir+"/single.par");
   par_file2 << "PROBLEM_FILE = " << dir <<"/single.tsp\n";
   par_file2 << "GAIN23 = NO\n";
@@ -238,7 +238,7 @@ int FastExplorationManager::planExploreMotion(
       }
       
       // solve the TSP and read the tour as indices
-      // solveTSPAndGetTour(cost_mat, "/root/thesis_ws/src/thesis/sw/bringup/resource");
+      // solveTSPAndGetTour(cost_mat, "/workspaces/stem_ws/src/thesis/sw/stem_bringup/resource");
       // readTourFromFile(indices, ep_->tsp_dir_);
       
       // Get the path of optimal tour from path matrix
@@ -706,7 +706,7 @@ void FastExplorationManager::getTargetCostMatrix(const Vector3d& cur_pos, const 
 // void FastExplorationManager::findTargetTour(Eigen::Matrix& cost_mat, vector<int>& indices){
 
 //        // solve the TSP and read the tour as indices
-//       solveTSPAndGetTour(cost_mat, indices, "/root/thesis_ws/src/thesis/sw/bringup/resource");
+//       solveTSPAndGetTour(cost_mat, indices, "/workspaces/stem_ws/src/thesis/sw/stem_bringup/resource");
 
 
 //       // Get the path of optimal tour from path matrix
