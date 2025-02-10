@@ -1,6 +1,6 @@
 #include <active_perception/diffuser.h>
 #include <active_perception/frontier_finder.h>
-#include <common/io.h>
+#include <stem_utils/io.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <chrono>

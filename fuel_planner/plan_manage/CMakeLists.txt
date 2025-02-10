@@ -25,7 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   tf
   geometry_msgs
-  common_msgs
+  stem_msgs
 )
 
 

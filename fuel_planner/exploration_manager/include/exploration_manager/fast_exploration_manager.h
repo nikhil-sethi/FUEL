@@ -9,7 +9,7 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <mutex>
-#include <common_msgs/Viewpoints.h>
+#include <stem_msgs/Viewpoints.h>
 
 using Eigen::Vector3d;
 using std::shared_ptr;
@@ -82,7 +82,7 @@ private:
                        vector<Vector3d>& refined_pts, vector<double>& refined_yaws);
 
   void shortenPath(vector<Vector3d>& path);
-  void targetViewpointsCallback(const common_msgs::Viewpoints& msg);
+  void targetViewpointsCallback(const stem_msgs::Viewpoints& msg);
   void customPoseCallback(const geometry_msgs::PoseWithCovarianceStamped& msg);
   // void findTargetTour(const Vector3d& cur_pos, const Vector3d& cur_vel, const Vector3d cur_yaw, vector<int>& indices);
   void getPathForTour(const Vector3d& pos, const vector<uint8_t>& ids, vector<Vector3d>& path);

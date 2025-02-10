@@ -9,7 +9,7 @@
 #include <active_perception/perception_utils.h>
 #include <tf/transform_datatypes.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <common_msgs/float64List.h>
+#include <stem_msgs/float64List.h>
 
 #include <plan_manage/backward.hpp>
 namespace backward {
@@ -381,7 +381,7 @@ void trajInfoCallback(const ros::TimerEvent e){
   double path_length = calcPathLength(traj_cmd_);
   double flight_time = (end_time - start_time).toSec();
 
-  common_msgs::float64List traj_info_msg;
+  stem_msgs::float64List traj_info_msg;
   traj_info_msg.header.stamp = ros::Time::now();
   traj_info_msg.data.push_back(path_length);
   traj_info_msg.data.push_back(flight_time);
@@ -495,7 +495,7 @@ int main(int argc, char** argv) {
   cmd_vis_pub = node.advertise<visualization_msgs::Marker>("planning/position_cmd_vis", 10);
   pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
   traj_pub = node.advertise<visualization_msgs::Marker>("planning/travel_traj", 10);
-  traj_info_pub = node.advertise<common_msgs::float64List>("/data/trajectory_info", 10);
+  traj_info_pub = node.advertise<stem_msgs::float64List>("/data/trajectory_info", 10);
 
   ros::Timer cmd_timer = node.createTimer(ros::Duration(0.05), cmdCallback);
   ros::Timer traj_info_timer = node.createTimer(ros::Duration(0.1), trajInfoCallback);

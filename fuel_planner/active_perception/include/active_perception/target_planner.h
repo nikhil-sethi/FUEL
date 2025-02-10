@@ -7,9 +7,9 @@
 #include <active_perception/frontier_finder.h>
 #include <active_perception/object_finder.h>
 #include <active_perception/diffuser.h>
-#include <common/utils.h>
-#include <common_msgs/Viewpoints.h>
-#include <sensor_model/camera.h>
+#include <stem_utils/utils.h>
+#include <stem_msgs/Viewpoints.h>
+#include <stem_utils/camera.h>
 #include <plan_env/raycast.h>
 #include <active_perception/perception_utils.h>
 // #include <traj_utils/planning_visualization.h>
@@ -92,7 +92,7 @@ class TargetPlanner{
         
         ros::Publisher vpt_pub;
         ros::Timer info_timer;
-        common_msgs::Viewpoints vpts_msg;
+        stem_msgs::Viewpoints vpts_msg;
         float _rmin, _min_vpt_clearance, _att_min, _min_info_gain;    
         Eigen::MatrixXd colormap;
 };

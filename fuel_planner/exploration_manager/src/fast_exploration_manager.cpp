@@ -20,7 +20,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <visualization_msgs/Marker.h>
-#include <target_search/TSP.h>
+#include <stem_msgs/TSP.h>
 
 using namespace Eigen;
 
@@ -128,7 +128,7 @@ void FastExplorationManager::initialize(ros::NodeHandle& nh) {
   custom_goal_pose.position.y = -1;
   custom_goal_pose.position.z = 1;
   
-  tsp_client = nh.serviceClient<target_search::TSP>("/planning/motsp_service");
+  tsp_client = nh.serviceClient<stem_msgs::TSP>("/planning/motsp_service");
 
 }
 
@@ -460,7 +460,7 @@ void FastExplorationManager::solveMOTSP(const Eigen::MatrixXd& cost_mat, const s
     cost_mat_flat.push_back((uint16_t)(cost_mat(i,j)*1000));
   }
 
-  target_search::TSP srv;
+  stem_msgs::TSP srv;
   srv.request.cost_mat_flat = cost_mat_flat;
   srv.request.priorities = priorities;
   srv.request.dim = dimension;
@@ -816,7 +816,7 @@ void FastExplorationManager::refineLocalTour(
   // ROS_WARN("create: %lf, search: %lf, parse: %lf", create_time, search_time, parse_time);
 }
 
-void FastExplorationManager::targetViewpointsCallback(const common_msgs::Viewpoints& msg){
+void FastExplorationManager::targetViewpointsCallback(const stem_msgs::Viewpoints& msg){
   target_vpts = msg.viewpoints.poses;
   priorities = msg.priorities;
 }

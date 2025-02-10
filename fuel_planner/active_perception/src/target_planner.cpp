@@ -1,6 +1,6 @@
 #include <active_perception/target_planner.h>
 #include <chrono>
-#include <common/io.h>
+#include <stem_utils/io.h>
 
 void wrapYaw(double& yaw) {
   while (yaw < -M_PI)
@@ -27,7 +27,7 @@ void TargetPlanner::init(ros::NodeHandle& nh){
     _camera.reset(new Camera(nh));
     // viz = fast_planner::PlanningVisualization(nh);
 
-    vpt_pub = nh.advertise<common_msgs::Viewpoints>("/objects/target_vpts", 1);
+    vpt_pub = nh.advertise<stem_msgs::Viewpoints>("/objects/target_vpts", 1);
     info_timer = nh.createTimer(ros::Duration(0.05), &TargetPlanner::informationGainTimer, this);
     
 }

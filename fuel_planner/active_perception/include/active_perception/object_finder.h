@@ -11,7 +11,7 @@
 #include <active_perception/target_planner.h>
 #include <pcl/point_cloud.h>
 #include <pcl/common/common.h>
-#include <common/utils.h>
+#include <stem_utils/utils.h>
 
 class TargetViewpoint;
 

@@ -13,7 +13,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/CompressedImage.h>
-#include <common_msgs/Float64Stamped.h>
+#include <stem_msgs/Float64Stamped.h>
 
 #include <memory>
 #include <random>

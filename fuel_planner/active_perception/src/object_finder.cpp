@@ -1,5 +1,5 @@
 #include <active_perception/object_finder.h>
-#include <common/utils.h>
+#include <stem_utils/utils.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/segmentation/conditional_euclidean_clustering.h>
 #include <pcl/filters/extract_indices.h>

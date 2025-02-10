@@ -4,7 +4,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <visualization_msgs/Marker.h>
-#include <common_msgs/uint8List.h>
+#include <stem_msgs/uint8List.h>
 #include <ctime>
 
 #include <fstream>
@@ -104,10 +104,10 @@ void MapROS::init(ros::NodeHandle& nh) {
   att_image_.reset(new cv::Mat(480,848, CV_8UC1));
   (*att_image_).setTo(cv::Scalar::all(0));
 
-  entropy_pub = nh.advertise<common_msgs::Float64Stamped>("/data/weighted_entropy", 10);
+  entropy_pub = nh.advertise<stem_msgs::Float64Stamped>("/data/weighted_entropy", 10);
 
-  // occ_pub_ = nh.advertise<common_msgs::uint8List>("/occupancy_buffer/", 10);
-  // occ_inflate_pub_ = nh.advertise<common_msgs::uint8List>("/occupancy_buffer_inflate/", 10);
+  // occ_pub_ = nh.advertise<stem_msgs::uint8List>("/occupancy_buffer/", 10);
+  // occ_inflate_pub_ = nh.advertise<stem_msgs::uint8List>("/occupancy_buffer_inflate/", 10);
   
   // occupancy_buffer_light = vector<uint8_t>(map_->buffer_size, 0); 
   // occ_timer_ = nh.createTimer(ros::Duration(0.05), &MapROS::occupancyTimer, this);
@@ -342,11 +342,11 @@ void MapROS::occupancyTimer(const ros::TimerEvent& e){
   for (int i=0; i<map_->md_->occupancy_buffer_.size(); ++i){
     occupancy_buffer_light[i] = map_->getOccupancy(i);
   }
-  common_msgs::uint8List occ_msg;
+  stem_msgs::uint8List occ_msg;
   occ_msg.data = occupancy_buffer_light;
   occ_pub_.publish(occ_msg);
 
-  common_msgs::uint8List occ_inflate_msg;
+  stem_msgs::uint8List occ_inflate_msg;
   occ_inflate_msg.data = map_->md_->occupancy_buffer_inflate_;
   occ_inflate_pub_.publish(occ_inflate_msg);
   
@@ -608,7 +608,7 @@ void MapROS::metricsTimer(const ros::TimerEvent& event){
   }
   // entropy_file<< ros::Time::now() <<","<< entropy<<"\n";
   // ROS_ERROR("Entropy: %f", entropy);
-  common_msgs::Float64Stamped msg;
+  stem_msgs::Float64Stamped msg;
   msg.header.stamp = ros::Time::now();
   msg.data = entropy;
   entropy_pub.publish(msg);

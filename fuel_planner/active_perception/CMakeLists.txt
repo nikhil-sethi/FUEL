@@ -17,9 +17,8 @@ plan_env
 bspline
 path_searching
 cv_bridge
-common
-sensor_model
-common_msgs
+stem_utils
+stem_msgs
 # traj_utils
 )
 
@@ -27,7 +26,7 @@ common_msgs
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES active_perception
- CATKIN_DEPENDS plan_env bspline path_searching common
+ CATKIN_DEPENDS plan_env bspline path_searching stem_utils
  DEPENDS system_lib
 )
 
